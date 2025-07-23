@@ -1,7 +1,8 @@
+// lib/auth/session.ts
 import { compare, hash } from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
-import { NewUser } from '@/lib/db/schema';
+import { User } from '@/lib/db/schema';
 
 const key = new TextEncoder().encode(process.env.AUTH_SECRET);
 const SALT_ROUNDS = 10;
@@ -18,7 +19,12 @@ export async function comparePasswords(
 }
 
 type SessionData = {
-  user: { id: number };
+  user: {
+    id: string;
+    email: string;
+    firstName?: string | null;
+    lastName?: string | null;
+  };
   expires: string;
 };
 
@@ -40,15 +46,26 @@ export async function verifyToken(input: string) {
 export async function getSession() {
   const session = (await cookies()).get('session')?.value;
   if (!session) return null;
-  return await verifyToken(session);
+  
+  try {
+    return await verifyToken(session);
+  } catch {
+    return null;
+  }
 }
 
-export async function setSession(user: NewUser) {
+export async function setSession(user: Pick<User, 'id' | 'email' | 'firstName' | 'lastName'>) {
   const expiresInOneDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const session: SessionData = {
-    user: { id: user.id! },
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    },
     expires: expiresInOneDay.toISOString(),
   };
+
   const encryptedSession = await signToken(session);
   (await cookies()).set('session', encryptedSession, {
     expires: expiresInOneDay,

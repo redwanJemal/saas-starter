@@ -1,287 +1,443 @@
+// app/(dashboard)/dashboard/security/page.tsx
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardFooter
-} from '@/components/ui/card';
-import { customerPortalAction } from '@/lib/payments/actions';
-import { useActionState } from 'react';
-import { TeamDataWithMembers, User } from '@/lib/db/schema';
-import { removeTeamMember, inviteTeamMember } from '@/app/(login)/actions';
-import useSWR from 'swr';
-import { Suspense } from 'react';
 import { Input } from '@/components/ui/input';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Loader2, PlusCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Lock, 
+  Trash2, 
+  Loader2, 
+  Shield, 
+  AlertTriangle,
+  CheckCircle,
+  Eye,
+  EyeOff,
+  Key
+} from 'lucide-react';
+import { useActionState, useState } from 'react';
+import { updatePassword, deleteAccount } from '@/app/(login)/actions';
+import { User as UserType } from '@/lib/db/schema';
+import useSWR from 'swr';
 
-type ActionState = {
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+type PasswordState = {
+  currentPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
   error?: string;
   success?: string;
 };
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+type DeleteState = {
+  password?: string;
+  error?: string;
+  success?: string;
+};
 
-function SubscriptionSkeleton() {
-  return (
-    <Card className="mb-8 h-[140px]">
-      <CardHeader>
-        <CardTitle>Team Subscription</CardTitle>
-      </CardHeader>
-    </Card>
-  );
-}
+function SecurityStatusCard() {
+  const { data: user } = useSWR<UserType>('/api/user', fetcher);
 
-function ManageSubscription() {
-  const { data: teamData } = useSWR<TeamDataWithMembers>('/api/team', fetcher);
-
-  return (
-    <Card className="mb-8">
-      <CardHeader>
-        <CardTitle>Team Subscription</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-            <div className="mb-4 sm:mb-0">
-              <p className="font-medium">
-                Current Plan: {teamData?.planName || 'Free'}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {teamData?.subscriptionStatus === 'active'
-                  ? 'Billed monthly'
-                  : teamData?.subscriptionStatus === 'trialing'
-                  ? 'Trial period'
-                  : 'No active subscription'}
-              </p>
-            </div>
-            <form action={customerPortalAction}>
-              <Button type="submit" variant="outline">
-                Manage Subscription
-              </Button>
-            </form>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TeamMembersSkeleton() {
-  return (
-    <Card className="mb-8 h-[140px]">
-      <CardHeader>
-        <CardTitle>Team Members</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="animate-pulse space-y-4 mt-1">
-          <div className="flex items-center space-x-4">
-            <div className="size-8 rounded-full bg-gray-200"></div>
-            <div className="space-y-2">
-              <div className="h-4 w-32 bg-gray-200 rounded"></div>
-              <div className="h-3 w-14 bg-gray-200 rounded"></div>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TeamMembers() {
-  const { data: teamData } = useSWR<TeamDataWithMembers>('/api/team', fetcher);
-  const [removeState, removeAction, isRemovePending] = useActionState<
-    ActionState,
-    FormData
-  >(removeTeamMember, {});
-
-  const getUserDisplayName = (user: Pick<User, 'id' | 'name' | 'email'>) => {
-    return user.name || user.email || 'Unknown User';
-  };
-
-  if (!teamData?.teamMembers?.length) {
+  if (!user) {
     return (
-      <Card className="mb-8">
+      <Card>
         <CardHeader>
-          <CardTitle>Team Members</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Security Status
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">No team members yet.</p>
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-gray-200 rounded w-32"></div>
+            <div className="h-4 bg-gray-200 rounded w-24"></div>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
-  return (
-    <Card className="mb-8">
-      <CardHeader>
-        <CardTitle>Team Members</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ul className="space-y-4">
-          {teamData.teamMembers.map((member, index) => (
-            <li key={member.id} className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Avatar>
-                  {/* 
-                    This app doesn't save profile images, but here
-                    is how you'd show them:
+  const securityItems = [
+    {
+      icon: Key,
+      title: 'Password',
+      description: 'Strong password set',
+      status: 'secure',
+      statusText: 'Secure'
+    },
+    {
+      icon: CheckCircle,
+      title: 'Email Verification',
+      description: user.emailVerifiedAt ? 'Email verified' : 'Email not verified',
+      status: user.emailVerifiedAt ? 'secure' : 'warning',
+      statusText: user.emailVerifiedAt ? 'Verified' : 'Pending'
+    },
+    {
+      icon: Shield,
+      title: 'Two-Factor Authentication',
+      description: user.twoFactorEnabled ? '2FA enabled' : '2FA not enabled',
+      status: user.twoFactorEnabled ? 'secure' : 'warning',
+      statusText: user.twoFactorEnabled ? 'Enabled' : 'Disabled'
+    },
+    {
+      icon: CheckCircle,
+      title: 'Account Status',
+      description: `Account is ${user.status}`,
+      status: user.status === 'active' ? 'secure' : 'error',
+      statusText: user.status ? user.status.charAt(0).toUpperCase() + user.status.slice(1) : 'Unknown'
+    }
+  ];
 
-                    <AvatarImage
-                      src={member.user.image || ''}
-                      alt={getUserDisplayName(member.user)}
-                    />
-                  */}
-                  <AvatarFallback>
-                    {getUserDisplayName(member.user)
-                      .split(' ')
-                      .map((n) => n[0])
-                      .join('')}
-                  </AvatarFallback>
-                </Avatar>
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5" />
+          Security Status
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {securityItems.map((item, index) => {
+          const getStatusColor = (status: string) => {
+            switch (status) {
+              case 'secure': return 'bg-green-50 text-green-700 border-green-200';
+              case 'warning': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+              case 'error': return 'bg-red-50 text-red-700 border-red-200';
+              default: return 'bg-gray-50 text-gray-700 border-gray-200';
+            }
+          };
+
+          return (
+            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <item.icon className="h-4 w-4 text-gray-500" />
                 <div>
-                  <p className="font-medium">
-                    {getUserDisplayName(member.user)}
-                  </p>
-                  <p className="text-sm text-muted-foreground capitalize">
-                    {member.role}
-                  </p>
+                  <p className="text-sm font-medium">{item.title}</p>
+                  <p className="text-xs text-gray-500">{item.description}</p>
                 </div>
               </div>
-              {index > 1 ? (
-                <form action={removeAction}>
-                  <input type="hidden" name="memberId" value={member.id} />
-                  <Button
-                    type="submit"
-                    variant="outline"
-                    size="sm"
-                    disabled={isRemovePending}
-                  >
-                    {isRemovePending ? 'Removing...' : 'Remove'}
-                  </Button>
-                </form>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-        {removeState?.error && (
-          <p className="text-red-500 mt-4">{removeState.error}</p>
+              <Badge variant="outline" className={getStatusColor(item.status)}>
+                {item.statusText}
+              </Badge>
+            </div>
+          );
+        })}
+
+        {user.lastLoginAt && (
+          <div className="pt-4 border-t">
+            <p className="text-xs text-gray-500">
+              Last sign in: {new Date(user.lastLoginAt).toLocaleString()}
+              {user.lastLoginIp && ` from ${user.lastLoginIp}`}
+            </p>
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function InviteTeamMemberSkeleton() {
-  return (
-    <Card className="h-[260px]">
-      <CardHeader>
-        <CardTitle>Invite Team Member</CardTitle>
-      </CardHeader>
-    </Card>
+function PasswordChangeForm() {
+  const [passwordState, passwordAction, isPasswordPending] = useActionState<PasswordState, FormData>(
+    updatePassword,
+    {}
   );
-}
 
-function InviteTeamMember() {
-  const { data: user } = useSWR<User>('/api/user', fetcher);
-  const isOwner = user?.role === 'owner';
-  const [inviteState, inviteAction, isInvitePending] = useActionState<
-    ActionState,
-    FormData
-  >(inviteTeamMember, {});
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
+
+  const togglePasswordVisibility = (field: keyof typeof showPasswords) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
+  };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Invite Team Member</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Lock className="h-5 w-5" />
+          Change Password
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <form action={inviteAction} className="space-y-4">
+        <form className="space-y-4" action={passwordAction}>
           <div>
-            <Label htmlFor="email" className="mb-2">
-              Email
+            <Label htmlFor="current-password" className="mb-2">
+              Current Password <span className="text-red-500">*</span>
             </Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="Enter email"
-              required
-              disabled={!isOwner}
-            />
+            <div className="relative">
+              <Input
+                id="current-password"
+                name="currentPassword"
+                type={showPasswords.current ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                minLength={8}
+                maxLength={100}
+                defaultValue={passwordState.currentPassword}
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => togglePasswordVisibility('current')}
+              >
+                {showPasswords.current ? (
+                  <EyeOff className="h-4 w-4 text-gray-400" />
+                ) : (
+                  <Eye className="h-4 w-4 text-gray-400" />
+                )}
+              </Button>
+            </div>
           </div>
+
           <div>
-            <Label>Role</Label>
-            <RadioGroup
-              defaultValue="member"
-              name="role"
-              className="flex space-x-4"
-              disabled={!isOwner}
-            >
-              <div className="flex items-center space-x-2 mt-2">
-                <RadioGroupItem value="member" id="member" />
-                <Label htmlFor="member">Member</Label>
-              </div>
-              <div className="flex items-center space-x-2 mt-2">
-                <RadioGroupItem value="owner" id="owner" />
-                <Label htmlFor="owner">Owner</Label>
-              </div>
-            </RadioGroup>
+            <Label htmlFor="new-password" className="mb-2">
+              New Password <span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="new-password"
+                name="newPassword"
+                type={showPasswords.new ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                minLength={8}
+                maxLength={100}
+                defaultValue={passwordState.newPassword}
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => togglePasswordVisibility('new')}
+              >
+                {showPasswords.new ? (
+                  <EyeOff className="h-4 w-4 text-gray-400" />
+                ) : (
+                  <Eye className="h-4 w-4 text-gray-400" />
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Password must be at least 8 characters long
+            </p>
           </div>
-          {inviteState?.error && (
-            <p className="text-red-500">{inviteState.error}</p>
+
+          <div>
+            <Label htmlFor="confirm-password" className="mb-2">
+              Confirm New Password <span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="confirm-password"
+                name="confirmPassword"
+                type={showPasswords.confirm ? "text" : "password"}
+                required
+                minLength={8}
+                maxLength={100}
+                defaultValue={passwordState.confirmPassword}
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => togglePasswordVisibility('confirm')}
+              >
+                {showPasswords.confirm ? (
+                  <EyeOff className="h-4 w-4 text-gray-400" />
+                ) : (
+                  <Eye className="h-4 w-4 text-gray-400" />
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {passwordState.error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 text-sm">{passwordState.error}</p>
+            </div>
           )}
-          {inviteState?.success && (
-            <p className="text-green-500">{inviteState.success}</p>
+
+          {passwordState.success && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-600 text-sm">{passwordState.success}</p>
+            </div>
           )}
+
           <Button
             type="submit"
-            className="bg-orange-500 hover:bg-orange-600 text-white"
-            disabled={isInvitePending || !isOwner}
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+            disabled={isPasswordPending}
           >
-            {isInvitePending ? (
+            {isPasswordPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Inviting...
+                Updating Password...
               </>
             ) : (
               <>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Invite Member
+                <Lock className="mr-2 h-4 w-4" />
+                Update Password
               </>
             )}
           </Button>
         </form>
       </CardContent>
-      {!isOwner && (
-        <CardFooter>
-          <p className="text-sm text-muted-foreground">
-            You must be a team owner to invite new members.
-          </p>
-        </CardFooter>
-      )}
     </Card>
   );
 }
 
-export default function SettingsPage() {
+function DeleteAccountForm() {
+  const [deleteState, deleteAction, isDeletePending] = useActionState<DeleteState, FormData>(
+    deleteAccount,
+    {}
+  );
+
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  return (
+    <Card className="border-red-200">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-red-600">
+          <AlertTriangle className="h-5 w-5" />
+          Danger Zone
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <h3 className="font-medium text-red-800 mb-2">Delete Account</h3>
+            <p className="text-sm text-red-700 mb-3">
+              Once you delete your account, there is no going back. This will permanently delete:
+            </p>
+            <ul className="text-sm text-red-700 space-y-1 mb-4">
+              <li>• Your customer profile and ID</li>
+              <li>• All package and shipment history</li>
+              <li>• Saved addresses and preferences</li>
+              <li>• Virtual warehouse addresses</li>
+              <li>• All invoices and payment records</li>
+            </ul>
+            <p className="text-sm font-medium text-red-800">
+              This action cannot be undone. Please be certain.
+            </p>
+          </div>
+
+          <form action={deleteAction} className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="confirm-delete"
+                checked={confirmDelete}
+                onChange={(e) => setConfirmDelete(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <Label htmlFor="confirm-delete" className="text-sm">
+                I understand that this action cannot be undone
+              </Label>
+            </div>
+
+            {confirmDelete && (
+              <div>
+                <Label htmlFor="delete-password" className="mb-2">
+                  Confirm Password <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="delete-password"
+                    name="password"
+                    type={showDeletePassword ? "text" : "password"}
+                    required
+                    minLength={8}
+                    maxLength={100}
+                    defaultValue={deleteState.password}
+                    className="pr-10"
+                    placeholder="Enter your password to confirm"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowDeletePassword(!showDeletePassword)}
+                  >
+                    {showDeletePassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {deleteState.error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-600 text-sm">{deleteState.error}</p>
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              variant="destructive"
+              className="w-full bg-red-600 hover:bg-red-700"
+              disabled={isDeletePending || !confirmDelete}
+            >
+              {isDeletePending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting Account...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Account Permanently
+                </>
+              )}
+            </Button>
+          </form>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function SecurityPage() {
   return (
     <section className="flex-1 p-4 lg:p-8">
-      <h1 className="text-lg lg:text-2xl font-medium mb-6">Team Settings</h1>
-      <Suspense fallback={<SubscriptionSkeleton />}>
-        <ManageSubscription />
-      </Suspense>
-      <Suspense fallback={<TeamMembersSkeleton />}>
-        <TeamMembers />
-      </Suspense>
-      <Suspense fallback={<InviteTeamMemberSkeleton />}>
-        <InviteTeamMember />
-      </Suspense>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Security Settings</h1>
+        <p className="text-gray-600 mt-1">
+          Manage your account security and password settings
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Security Status and Password Change */}
+        <div className="lg:col-span-2 space-y-8">
+          <PasswordChangeForm />
+          <DeleteAccountForm />
+        </div>
+
+        {/* Security Status Sidebar */}
+        <div>
+          <SecurityStatusCard />
+        </div>
+      </div>
     </section>
   );
 }

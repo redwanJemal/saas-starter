@@ -1,13 +1,24 @@
+// app/(dashboard)/dashboard/layout.tsx
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Users, Settings, Shield, Activity, Menu } from 'lucide-react';
+import { 
+  Package, 
+  Settings, 
+  Shield, 
+  Activity, 
+  Menu,
+  Home,
+  MapPin,
+  FileText,
+  Truck
+} from 'lucide-react';
 
 export default function DashboardLayout({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) {
@@ -15,10 +26,54 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const navItems = [
-    { href: '/dashboard', icon: Users, label: 'Team' },
-    { href: '/dashboard/general', icon: Settings, label: 'General' },
-    { href: '/dashboard/activity', icon: Activity, label: 'Activity' },
-    { href: '/dashboard/security', icon: Shield, label: 'Security' }
+    { 
+      href: '/dashboard', 
+      icon: Home, 
+      label: 'Overview',
+      description: 'Account overview and stats'
+    },
+    { 
+      href: '/dashboard/packages', 
+      icon: Package, 
+      label: 'Packages',
+      description: 'Your received packages'
+    },
+    { 
+      href: '/dashboard/shipments', 
+      icon: Truck, 
+      label: 'Shipments',
+      description: 'Track your shipments'
+    },
+    { 
+      href: '/dashboard/addresses', 
+      icon: MapPin, 
+      label: 'Addresses',
+      description: 'Manage shipping addresses'
+    },
+    { 
+      href: '/dashboard/invoices', 
+      icon: FileText, 
+      label: 'Invoices',
+      description: 'Billing and invoices'
+    },
+    { 
+      href: '/dashboard/general', 
+      icon: Settings, 
+      label: 'General',
+      description: 'Account settings'
+    },
+    { 
+      href: '/dashboard/security', 
+      icon: Shield, 
+      label: 'Security',
+      description: 'Password and security'
+    },
+    { 
+      href: '/dashboard/activity', 
+      icon: Activity, 
+      label: 'Activity',
+      description: 'Account activity log'
+    }
   ];
 
   return (
@@ -26,7 +81,7 @@ export default function DashboardLayout({
       {/* Mobile header */}
       <div className="lg:hidden flex items-center justify-between bg-white border-b border-gray-200 p-4">
         <div className="flex items-center">
-          <span className="font-medium">Settings</span>
+          <span className="font-medium">Dashboard</span>
         </div>
         <Button
           className="-mr-3"
@@ -48,25 +103,45 @@ export default function DashboardLayout({
           }`}
         >
           <nav className="h-full overflow-y-auto p-4">
-            {navItems.map((item) => (
-              <Link key={item.href} href={item.href} passHref>
-                <Button
-                  variant={pathname === item.href ? 'secondary' : 'ghost'}
-                  className={`shadow-none my-1 w-full justify-start ${
-                    pathname === item.href ? 'bg-gray-100' : ''
-                  }`}
-                  onClick={() => setIsSidebarOpen(false)}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Button>
-              </Link>
-            ))}
+            <div className="space-y-1">
+              {navItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link key={item.href} href={item.href} passHref>
+                    <Button
+                      variant={isActive ? 'secondary' : 'ghost'}
+                      className={`shadow-none w-full justify-start h-auto p-3 ${
+                        isActive ? 'bg-orange-50 text-orange-700 border-orange-200' : ''
+                      }`}
+                      onClick={() => setIsSidebarOpen(false)}
+                    >
+                      <item.icon className={`h-5 w-5 mr-3 ${
+                        isActive ? 'text-orange-600' : 'text-gray-500'
+                      }`} />
+                      <div className="text-left">
+                        <div className={`text-sm font-medium ${
+                          isActive ? 'text-orange-700' : 'text-gray-900'
+                        }`}>
+                          {item.label}
+                        </div>
+                        <div className={`text-xs ${
+                          isActive ? 'text-orange-600' : 'text-gray-500'
+                        }`}>
+                          {item.description}
+                        </div>
+                      </div>
+                    </Button>
+                  </Link>
+                );
+              })}
+            </div>
           </nav>
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-0 lg:p-4">{children}</main>
+        <main className="flex-1 overflow-y-auto p-0 lg:p-4">
+          {children}
+        </main>
       </div>
     </div>
   );

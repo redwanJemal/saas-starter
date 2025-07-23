@@ -1,26 +1,22 @@
 import Stripe from 'stripe';
 import { redirect } from 'next/navigation';
-import { Team } from '@/lib/db/schema';
-import {
-  getTeamByStripeCustomerId,
-  getUser,
-  updateTeamSubscription
-} from '@/lib/db/queries';
+import { CustomerProfile } from '@/lib/db/schema';
+import { getCustomerByStripeCustomerId, getUser, updateCustomerSubscription } from '@/lib/db/queries';
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-04-30.basil'
 });
 
 export async function createCheckoutSession({
-  team,
+  customerProfile,
   priceId
 }: {
-  team: Team | null;
+  customerProfile: CustomerProfile | null;
   priceId: string;
 }) {
   const user = await getUser();
-
-  if (!team || !user) {
+  
+  if (!customerProfile || !user) {
     redirect(`/sign-up?redirect=checkout&priceId=${priceId}`);
   }
 
@@ -35,7 +31,7 @@ export async function createCheckoutSession({
     mode: 'subscription',
     success_url: `${process.env.BASE_URL}/api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.BASE_URL}/pricing`,
-    customer: team.stripeCustomerId || undefined,
+    customer: customerProfile.stripeCustomerId || undefined,
     client_reference_id: user.id.toString(),
     allow_promotion_codes: true,
     subscription_data: {
@@ -46,8 +42,8 @@ export async function createCheckoutSession({
   redirect(session.url!);
 }
 
-export async function createCustomerPortalSession(team: Team) {
-  if (!team.stripeCustomerId || !team.stripeProductId) {
+export async function createCustomerPortalSession(customerProfile: CustomerProfile) {
+  if (!customerProfile.stripeCustomerId || !customerProfile.stripeProductId) {
     redirect('/pricing');
   }
 
@@ -57,17 +53,19 @@ export async function createCustomerPortalSession(team: Team) {
   if (configurations.data.length > 0) {
     configuration = configurations.data[0];
   } else {
-    const product = await stripe.products.retrieve(team.stripeProductId);
+    const product = await stripe.products.retrieve(customerProfile.stripeProductId);
+    
     if (!product.active) {
-      throw new Error("Team's product is not active in Stripe");
+      throw new Error("Customer's product is not active in Stripe");
     }
 
     const prices = await stripe.prices.list({
       product: product.id,
       active: true
     });
+
     if (prices.data.length === 0) {
-      throw new Error("No active prices found for the team's product");
+      throw new Error("No active prices found for the customer's product");
     }
 
     configuration = await stripe.billingPortal.configurations.create({
@@ -108,36 +106,34 @@ export async function createCustomerPortalSession(team: Team) {
   }
 
   return stripe.billingPortal.sessions.create({
-    customer: team.stripeCustomerId,
+    customer: customerProfile.stripeCustomerId,
     return_url: `${process.env.BASE_URL}/dashboard`,
     configuration: configuration.id
   });
 }
 
-export async function handleSubscriptionChange(
-  subscription: Stripe.Subscription
-) {
+export async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string;
   const subscriptionId = subscription.id;
   const status = subscription.status;
 
-  const team = await getTeamByStripeCustomerId(customerId);
+  const customerProfile = await getCustomerByStripeCustomerId(customerId);
 
-  if (!team) {
-    console.error('Team not found for Stripe customer:', customerId);
+  if (!customerProfile) {
+    console.error('Customer profile not found for Stripe customer:', customerId);
     return;
   }
 
   if (status === 'active' || status === 'trialing') {
     const plan = subscription.items.data[0]?.plan;
-    await updateTeamSubscription(team.id, {
+    await updateCustomerSubscription(customerProfile.id, {
       stripeSubscriptionId: subscriptionId,
       stripeProductId: plan?.product as string,
       planName: (plan?.product as Stripe.Product).name,
       subscriptionStatus: status
     });
   } else if (status === 'canceled' || status === 'unpaid') {
-    await updateTeamSubscription(team.id, {
+    await updateCustomerSubscription(customerProfile.id, {
       stripeSubscriptionId: null,
       stripeProductId: null,
       planName: null,
@@ -155,8 +151,7 @@ export async function getStripePrices() {
 
   return prices.data.map((price) => ({
     id: price.id,
-    productId:
-      typeof price.product === 'string' ? price.product : price.product.id,
+    productId: typeof price.product === 'string' ? price.product : price.product.id,
     unitAmount: price.unit_amount,
     currency: price.currency,
     interval: price.recurring?.interval,
@@ -174,9 +169,8 @@ export async function getStripeProducts() {
     id: product.id,
     name: product.name,
     description: product.description,
-    defaultPriceId:
-      typeof product.default_price === 'string'
-        ? product.default_price
-        : product.default_price?.id
+    defaultPriceId: typeof product.default_price === 'string'
+      ? product.default_price
+      : product.default_price?.id
   }));
 }

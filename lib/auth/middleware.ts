@@ -1,6 +1,7 @@
+// lib/auth/middleware.ts - Add the missing withTeam function and other updates
 import { z } from 'zod';
-import { TeamDataWithMembers, User } from '@/lib/db/schema';
-import { getTeamForUser, getUser } from '@/lib/db/queries';
+import { User, CustomerProfile } from '@/lib/db/schema';
+import { getUser, getUserWithProfile } from '@/lib/db/queries';
 import { redirect } from 'next/navigation';
 
 export type ActionState = {
@@ -23,7 +24,6 @@ export function validatedAction<S extends z.ZodType<any, any>, T>(
     if (!result.success) {
       return { error: result.error.errors[0].message };
     }
-
     return action(result.data, formData);
   };
 }
@@ -53,23 +53,32 @@ export function validatedActionWithUser<S extends z.ZodType<any, any>, T>(
   };
 }
 
-type ActionWithTeamFunction<T> = (
+// Add withTeam compatibility function (maps to customer profile)
+type ValidatedActionWithCustomerFunction<S extends z.ZodType<any, any>, T> = (
+  data: z.infer<S>,
   formData: FormData,
-  team: TeamDataWithMembers
+  customerProfile: CustomerProfile
 ) => Promise<T>;
 
-export function withTeam<T>(action: ActionWithTeamFunction<T>) {
-  return async (formData: FormData): Promise<T> => {
-    const user = await getUser();
-    if (!user) {
-      redirect('/sign-in');
+export function withCustomer<S extends z.ZodType<any, any>, T>(
+  schema: S,
+  action: ValidatedActionWithCustomerFunction<S, T>
+) {
+  return async (prevState: ActionState, formData: FormData) => {
+    const userWithProfile = await getUserWithProfile();
+    
+    if (!userWithProfile?.customerProfile) {
+      redirect('/sign-up');
     }
 
-    const team = await getTeamForUser();
-    if (!team) {
-      throw new Error('Team not found');
+    const result = schema.safeParse(Object.fromEntries(formData));
+    if (!result.success) {
+      return { error: result.error.errors[0].message };
     }
 
-    return action(formData, team);
+    return action(result.data, formData, userWithProfile.customerProfile);
   };
 }
+
+// Compatibility alias for existing code
+export const withTeam = withCustomer;

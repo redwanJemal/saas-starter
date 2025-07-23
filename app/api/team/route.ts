@@ -1,6 +1,7 @@
-import { getTeamForUser } from '@/lib/db/queries';
+import { getUserWithProfile } from '@/lib/db/queries';
 
 export async function GET() {
-  const team = await getTeamForUser();
-  return Response.json(team);
+  // Return customer profile for compatibility with existing code
+  const userWithProfile = await getUserWithProfile();
+  return Response.json(userWithProfile?.customerProfile || null);
 }

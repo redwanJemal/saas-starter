@@ -74,6 +74,8 @@ You can listen for Stripe webhooks locally through their CLI to handle subscript
 stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
+ openssl rand -hex 32
+ 
 ## Testing Payments
 
 To test Stripe payments, use the following test card details:
