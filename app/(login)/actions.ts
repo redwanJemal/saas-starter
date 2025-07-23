@@ -53,7 +53,7 @@ async function logActivity(
     description,
     resourceType: resourceType || 'user',
     resourceId,
-    ipAddress: ipAddress || ''
+    ipAddress: ipAddress || null // Use null instead of empty string for IP address
   };
 
   await db.insert(activityLogs).values(newActivity);
