@@ -1,136 +1,203 @@
-// app/(dashboard)/dashboard/security/page.tsx
-'use client';
-
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+// app/(dashboard)/dashboard/page.tsx
+import { Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Lock, 
-  Trash2, 
-  Loader2, 
-  Shield, 
-  AlertTriangle,
+  Package, 
+  Truck, 
+  MapPin, 
+  CreditCard, 
+  ArrowRight,
+  Clock,
   CheckCircle,
-  Eye,
-  EyeOff,
-  Key
+  AlertCircle,
+  FileText
 } from 'lucide-react';
-import { useActionState, useState } from 'react';
-import { updatePassword, deleteAccount } from '@/app/(login)/actions';
-import { User as UserType } from '@/lib/db/schema';
-import useSWR from 'swr';
+import Link from 'next/link';
+import { 
+  getUserWithProfile, 
+  getCustomerDashboardStats,
+  getCustomerPackages,
+  getCustomerShipments,
+  getCustomerVirtualAddresses
+} from '@/lib/db/queries';
+import { redirect } from 'next/navigation';
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-type PasswordState = {
-  currentPassword?: string;
-  newPassword?: string;
-  confirmPassword?: string;
-  error?: string;
-  success?: string;
-};
-
-type DeleteState = {
-  password?: string;
-  error?: string;
-  success?: string;
-};
-
-function SecurityStatusCard() {
-  const { data: user } = useSWR<UserType>('/api/user', fetcher);
-
-  if (!user) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Security Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-32"></div>
-            <div className="h-4 bg-gray-200 rounded w-24"></div>
-          </div>
-        </CardContent>
-      </Card>
-    );
+// Component for dashboard stats
+async function DashboardStats() {
+  const userWithProfile = await getUserWithProfile();
+  
+  if (!userWithProfile?.customerProfile) {
+    redirect('/sign-in');
   }
 
-  const securityItems = [
+  const stats = await getCustomerDashboardStats(userWithProfile.customerProfile.id);
+
+  const statCards = [
     {
-      icon: Key,
-      title: 'Password',
-      description: 'Strong password set',
-      status: 'secure',
-      statusText: 'Secure'
+      title: 'Total Packages',
+      value: stats.totalPackages,
+      subtitle: `${stats.packagesReady} ready to ship`,
+      icon: Package,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      href: '/dashboard/packages'
     },
     {
-      icon: CheckCircle,
-      title: 'Email Verification',
-      description: user.emailVerifiedAt ? 'Email verified' : 'Email not verified',
-      status: user.emailVerifiedAt ? 'secure' : 'warning',
-      statusText: user.emailVerifiedAt ? 'Verified' : 'Pending'
+      title: 'Active Shipments', 
+      value: stats.shipmentsInTransit,
+      subtitle: `${stats.shipmentsDelivered} delivered`,
+      icon: Truck,
+      color: 'text-orange-600', 
+      bgColor: 'bg-orange-50',
+      href: '/dashboard/shipments'
     },
     {
-      icon: Shield,
-      title: 'Two-Factor Authentication',
-      description: user.twoFactorEnabled ? '2FA enabled' : '2FA not enabled',
-      status: user.twoFactorEnabled ? 'secure' : 'warning',
-      statusText: user.twoFactorEnabled ? 'Enabled' : 'Disabled'
+      title: 'Saved Addresses',
+      value: stats.totalAddresses,
+      subtitle: 'Shipping destinations',
+      icon: MapPin,
+      color: 'text-green-600',
+      bgColor: 'bg-green-50',
+      href: '/dashboard/addresses'
     },
     {
-      icon: CheckCircle,
-      title: 'Account Status',
-      description: `Account is ${user.status}`,
-      status: user.status === 'active' ? 'secure' : 'error',
-      statusText: user.status ? user.status.charAt(0).toUpperCase() + user.status.slice(1) : 'Unknown'
+      title: 'Total Shipments',
+      value: stats.totalShipments,
+      subtitle: 'All time',
+      icon: FileText,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      href: '/dashboard/invoices'
     }
   ];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          Security Status
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {securityItems.map((item, index) => {
-          const getStatusColor = (status: string) => {
-            switch (status) {
-              case 'secure': return 'bg-green-50 text-green-700 border-green-200';
-              case 'warning': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
-              case 'error': return 'bg-red-50 text-red-700 border-red-200';
-              default: return 'bg-gray-50 text-gray-700 border-gray-200';
-            }
-          };
-
-          return (
-            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <item.icon className="h-4 w-4 text-gray-500" />
-                <div>
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-gray-500">{item.description}</p>
-                </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {statCards.map((stat, index) => (
+        <Card key={index} className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">
+                  {stat.title}
+                </p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {stat.value}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stat.subtitle}
+                </p>
               </div>
-              <Badge variant="outline" className={getStatusColor(item.status)}>
-                {item.statusText}
-              </Badge>
+              <div className={`${stat.bgColor} ${stat.color} p-3 rounded-lg`}>
+                <stat.icon className="h-6 w-6" />
+              </div>
             </div>
-          );
-        })}
+            <Link href={stat.href}>
+              <Button variant="ghost" size="sm" className="w-full mt-3 justify-between">
+                View Details
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
-        {user.lastLoginAt && (
-          <div className="pt-4 border-t">
-            <p className="text-xs text-gray-500">
-              Last sign in: {new Date(user.lastLoginAt).toLocaleString()}
-              {user.lastLoginIp && ` from ${user.lastLoginIp}`}
+// Component for recent packages
+async function RecentPackages() {
+  const userWithProfile = await getUserWithProfile();
+  
+  if (!userWithProfile?.customerProfile) {
+    return null;
+  }
+
+  const packages = await getCustomerPackages(userWithProfile.customerProfile.id, 5);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ready_to_ship': return 'bg-orange-100 text-orange-800';
+      case 'shipped': return 'bg-blue-100 text-blue-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
+      case 'received': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'ready_to_ship': return Clock;
+      case 'shipped': return Truck;
+      case 'delivered': return CheckCircle;
+      case 'received': return Package;
+      default: return AlertCircle;
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2">
+          <Package className="h-5 w-5" />
+          Recent Packages
+        </CardTitle>
+        <Link href="/dashboard/packages">
+          <Button variant="outline" size="sm">
+            View All
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </Link>
+      </CardHeader>
+      <CardContent>
+        {packages.length > 0 ? (
+          <div className="space-y-4">
+            {packages.map((pkg) => {
+              const StatusIcon = getStatusIcon(pkg.status || '');
+              return (
+                <div
+                  key={pkg.id}
+                  className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-gray-100 p-2 rounded-lg">
+                      <StatusIcon className="h-4 w-4 text-gray-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">
+                        {pkg.description || `Package ${pkg.internalId}`}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        From: {pkg.senderName || 'Unknown sender'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Warehouse: {pkg.warehouse.name}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <Badge 
+                      variant="secondary" 
+                      className={getStatusColor(pkg.status || '')}
+                    >
+                      {pkg.status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </Badge>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(pkg.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">No packages yet</p>
+            <p className="text-sm text-gray-400 mt-1">
+              Packages will appear here when they arrive at our warehouse
             </p>
           </div>
         )}
@@ -139,304 +206,139 @@ function SecurityStatusCard() {
   );
 }
 
-function PasswordChangeForm() {
-  const [passwordState, passwordAction, isPasswordPending] = useActionState<PasswordState, FormData>(
-    updatePassword,
-    {}
-  );
+// Component for virtual addresses
+async function VirtualAddresses() {
+  const userWithProfile = await getUserWithProfile();
+  
+  if (!userWithProfile?.customerProfile) {
+    return null;
+  }
 
-  const [showPasswords, setShowPasswords] = useState({
-    current: false,
-    new: false,
-    confirm: false
-  });
-
-  const togglePasswordVisibility = (field: keyof typeof showPasswords) => {
-    setShowPasswords(prev => ({
-      ...prev,
-      [field]: !prev[field]
-    }));
-  };
+  const virtualAddresses = await getCustomerVirtualAddresses(userWithProfile.customerProfile.id);
+  const customerId = userWithProfile.customerProfile.customerId;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Lock className="h-5 w-5" />
-          Change Password
+          <MapPin className="h-5 w-5" />
+          Your Virtual Addresses
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form className="space-y-4" action={passwordAction}>
-          <div>
-            <Label htmlFor="current-password" className="mb-2">
-              Current Password <span className="text-red-500">*</span>
-            </Label>
-            <div className="relative">
-              <Input
-                id="current-password"
-                name="currentPassword"
-                type={showPasswords.current ? "text" : "password"}
-                autoComplete="current-password"
-                required
-                minLength={8}
-                maxLength={100}
-                defaultValue={passwordState.currentPassword}
-                className="pr-10"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => togglePasswordVisibility('current')}
+        {virtualAddresses.length > 0 ? (
+          <div className="space-y-4">
+            {virtualAddresses.map((assignment) => (
+              <div 
+                key={assignment.id} 
+                className="p-4 border border-gray-200 rounded-lg bg-gray-50"
               >
-                {showPasswords.current ? (
-                  <EyeOff className="h-4 w-4 text-gray-400" />
-                ) : (
-                  <Eye className="h-4 w-4 text-gray-400" />
-                )}
-              </Button>
-            </div>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {assignment.warehouse.name}
+                    </p>
+                    <div className="mt-2 text-sm text-gray-600 space-y-1">
+                      <p className="font-medium">{userWithProfile.firstName} {userWithProfile.lastName} ({customerId})</p>
+                      <p>{assignment.warehouse.addressLine1}</p>
+                      {assignment.warehouse.addressLine2 && (
+                        <p>{assignment.warehouse.addressLine2}</p>
+                      )}
+                      <p>
+                        {assignment.warehouse.city}, {assignment.warehouse.postalCode}
+                      </p>
+                      <p>{assignment.warehouse.countryCode}</p>
+                      {assignment.warehouse.phone && (
+                        <p>Phone: {assignment.warehouse.phone}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    Active
+                  </Badge>
+                </div>
+              </div>
+            ))}
           </div>
-
-          <div>
-            <Label htmlFor="new-password" className="mb-2">
-              New Password <span className="text-red-500">*</span>
-            </Label>
-            <div className="relative">
-              <Input
-                id="new-password"
-                name="newPassword"
-                type={showPasswords.new ? "text" : "password"}
-                autoComplete="new-password"
-                required
-                minLength={8}
-                maxLength={100}
-                defaultValue={passwordState.newPassword}
-                className="pr-10"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => togglePasswordVisibility('new')}
-              >
-                {showPasswords.new ? (
-                  <EyeOff className="h-4 w-4 text-gray-400" />
-                ) : (
-                  <Eye className="h-4 w-4 text-gray-400" />
-                )}
-              </Button>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Password must be at least 8 characters long
-            </p>
+        ) : (
+          <div className="text-center py-8">
+            <MapPin className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">No virtual addresses available</p>
           </div>
-
-          <div>
-            <Label htmlFor="confirm-password" className="mb-2">
-              Confirm New Password <span className="text-red-500">*</span>
-            </Label>
-            <div className="relative">
-              <Input
-                id="confirm-password"
-                name="confirmPassword"
-                type={showPasswords.confirm ? "text" : "password"}
-                required
-                minLength={8}
-                maxLength={100}
-                defaultValue={passwordState.confirmPassword}
-                className="pr-10"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => togglePasswordVisibility('confirm')}
-              >
-                {showPasswords.confirm ? (
-                  <EyeOff className="h-4 w-4 text-gray-400" />
-                ) : (
-                  <Eye className="h-4 w-4 text-gray-400" />
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {passwordState.error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-600 text-sm">{passwordState.error}</p>
-            </div>
-          )}
-
-          {passwordState.success && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-green-600 text-sm">{passwordState.success}</p>
-            </div>
-          )}
-
-          <Button
-            type="submit"
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-            disabled={isPasswordPending}
-          >
-            {isPasswordPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Updating Password...
-              </>
-            ) : (
-              <>
-                <Lock className="mr-2 h-4 w-4" />
-                Update Password
-              </>
-            )}
-          </Button>
-        </form>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-function DeleteAccountForm() {
-  const [deleteState, deleteAction, isDeletePending] = useActionState<DeleteState, FormData>(
-    deleteAccount,
-    {}
-  );
-
-  const [showDeletePassword, setShowDeletePassword] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
+// Loading components
+function DashboardStatsSkeleton() {
   return (
-    <Card className="border-red-200">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {[...Array(4)].map((_, i) => (
+        <Card key={i}>
+          <CardContent className="p-6">
+            <div className="animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-20"></div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function RecentPackagesSkeleton() {
+  return (
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-red-600">
-          <AlertTriangle className="h-5 w-5" />
-          Danger Zone
-        </CardTitle>
+        <CardTitle>Recent Packages</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <h3 className="font-medium text-red-800 mb-2">Delete Account</h3>
-            <p className="text-sm text-red-700 mb-3">
-              Once you delete your account, there is no going back. This will permanently delete:
-            </p>
-            <ul className="text-sm text-red-700 space-y-1 mb-4">
-              <li>• Your customer profile and ID</li>
-              <li>• All package and shipment history</li>
-              <li>• Saved addresses and preferences</li>
-              <li>• Virtual warehouse addresses</li>
-              <li>• All invoices and payment records</li>
-            </ul>
-            <p className="text-sm font-medium text-red-800">
-              This action cannot be undone. Please be certain.
-            </p>
-          </div>
-
-          <form action={deleteAction} className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="confirm-delete"
-                checked={confirmDelete}
-                onChange={(e) => setConfirmDelete(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <Label htmlFor="confirm-delete" className="text-sm">
-                I understand that this action cannot be undone
-              </Label>
+        <div className="animate-pulse space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex items-center space-x-4">
+              <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
+              <div className="flex-1">
+                <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-24"></div>
+              </div>
             </div>
-
-            {confirmDelete && (
-              <div>
-                <Label htmlFor="delete-password" className="mb-2">
-                  Confirm Password <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="delete-password"
-                    name="password"
-                    type={showDeletePassword ? "text" : "password"}
-                    required
-                    minLength={8}
-                    maxLength={100}
-                    defaultValue={deleteState.password}
-                    className="pr-10"
-                    placeholder="Enter your password to confirm"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowDeletePassword(!showDeletePassword)}
-                  >
-                    {showDeletePassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {deleteState.error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-600 text-sm">{deleteState.error}</p>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              variant="destructive"
-              className="w-full bg-red-600 hover:bg-red-700"
-              disabled={isDeletePending || !confirmDelete}
-            >
-              {isDeletePending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting Account...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Account Permanently
-                </>
-              )}
-            </Button>
-          </form>
+          ))}
         </div>
       </CardContent>
     </Card>
   );
 }
 
-export default function SecurityPage() {
+export default function DashboardPage() {
   return (
     <section className="flex-1 p-4 lg:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Security Settings</h1>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-600 mt-1">
-          Manage your account security and password settings
+          Welcome to your package forwarding dashboard
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Security Status and Password Change */}
-        <div className="lg:col-span-2 space-y-8">
-          <PasswordChangeForm />
-          <DeleteAccountForm />
-        </div>
+      {/* Stats Cards */}
+      <Suspense fallback={<DashboardStatsSkeleton />}>
+        <DashboardStats />
+      </Suspense>
 
-        {/* Security Status Sidebar */}
-        <div>
-          <SecurityStatusCard />
-        </div>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Recent Packages */}
+        <Suspense fallback={<RecentPackagesSkeleton />}>
+          <RecentPackages />
+        </Suspense>
+
+        {/* Virtual Addresses */}
+        <Suspense fallback={<RecentPackagesSkeleton />}>
+          <VirtualAddresses />
+        </Suspense>
       </div>
     </section>
   );
