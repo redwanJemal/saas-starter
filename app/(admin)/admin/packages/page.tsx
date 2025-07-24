@@ -100,8 +100,8 @@ export default function AdminPackagesPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
+        page: (pagination?.page || 1).toString(),
+        limit: (pagination?.limit || 20).toString(),
         ...(search && { search }),
         ...(statusFilter && { status: statusFilter }),
         ...(warehouseFilter && { warehouse_id: warehouseFilter })
@@ -120,7 +120,7 @@ export default function AdminPackagesPage() {
 
   useEffect(() => {
     fetchPackages();
-  }, [pagination.page, pagination.limit, search, statusFilter, warehouseFilter]);
+  }, [pagination?.page, pagination?.limit, search, statusFilter, warehouseFilter]);
 
   const handlePaginationChange = (page: number, limit: number) => {
     setPagination(prev => ({ ...prev, page, limit }));
@@ -301,11 +301,11 @@ export default function AdminPackagesPage() {
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="flex items-center gap-1">
             <Package className="h-3 w-3" />
-            {pagination.total} total
+            {pagination?.total || 0} total
           </Badge>
           <Badge variant="outline" className="flex items-center gap-1">
             <CheckCircle className="h-3 w-3" />
-            {packages.filter(p => p.status === 'ready_to_ship').length} ready
+            {packages?.filter(p => p.status === 'ready_to_ship').length || 0} ready
           </Badge>
         </div>
       </div>

@@ -772,12 +772,23 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [tenants.id],
   }),
   customerProfile: one(customerProfiles),
-  userRoles: many(userRoles),
+  
+  // Explicitly name the user roles relation to match the other side
+  userRoles: many(userRoles, {
+    relationName: 'userRoleAssignments'
+  }),
+  
+  // Keep other relations as they are
   packagesProcessed: many(packages),
   shipmentsCreated: many(shipments),
   documentsUploaded: many(packageDocuments),
   statusChanges: many(packageStatusHistory),
   activityLogs: many(activityLogs),
+  
+  // Add relation for roles assigned by this user
+  rolesAssigned: many(userRoles, {
+    relationName: 'roleAssignments'
+  }),
 }));
 
 export const rolesRelations = relations(roles, ({ one, many }) => ({
@@ -805,17 +816,20 @@ export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => 
 }));
 
 export const userRolesRelations = relations(userRoles, ({ one }) => ({
-  user: one(users, {
-    fields: [userRoles.userId],
+  // Explicitly name the relations to avoid ambiguity
+  user: one(users, { 
+    fields: [userRoles.userId], 
     references: [users.id],
+    relationName: 'userRoleAssignments' // Explicit name
   }),
-  role: one(roles, {
-    fields: [userRoles.roleId],
-    references: [roles.id],
+  role: one(roles, { 
+    fields: [userRoles.roleId], 
+    references: [roles.id] 
   }),
-  assignedByUser: one(users, {
-    fields: [userRoles.assignedBy],
+  assignedByUser: one(users, { 
+    fields: [userRoles.assignedBy], 
     references: [users.id],
+    relationName: 'roleAssignments' // Explicit name
   }),
 }));
 
@@ -877,6 +891,7 @@ export const customerWarehouseAssignmentsRelations = relations(customerWarehouse
   assignedByUser: one(users, {
     fields: [customerWarehouseAssignments.assignedBy],
     references: [users.id],
+    relationName: 'warehouseAssignments' // Explicit name to avoid conflict
   }),
 }));
 

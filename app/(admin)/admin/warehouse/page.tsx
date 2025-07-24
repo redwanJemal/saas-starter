@@ -83,8 +83,8 @@ export default function AdminWarehousesPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
+        page: (pagination?.page || 1).toString(),
+        limit: (pagination?.limit || 20).toString(),
         ...(search && { search }),
         ...(statusFilter && { status: statusFilter })
       });
@@ -115,8 +115,9 @@ export default function AdminWarehousesPage() {
     }).format(amount);
   };
 
-  const formatWeight = (weight: number) => {
-    return `${weight.toFixed(1)} kg`;
+  const formatWeight = (weight: unknown): string => {
+    const num = Number(weight);
+    return Number.isFinite(num) ? `${num.toFixed(1)} kg` : 'N/A';
   };
 
   const columns: ColumnDef<WarehouseData>[] = [
@@ -307,7 +308,7 @@ export default function AdminWarehousesPage() {
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="flex items-center gap-1">
             <Warehouse className="h-3 w-3" />
-            {pagination.total} total
+            {pagination?.total || 0} total
           </Badge>
         </div>
       </div>

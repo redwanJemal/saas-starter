@@ -117,8 +117,8 @@ export default function AdminInvoicesPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
+        page: (pagination?.page || 1).toString(),
+        limit: (pagination?.limit || 20).toString(),
         ...(search && { search }),
         ...(statusFilter && { status: statusFilter }),
         ...(typeFilter && { type: typeFilter })
@@ -348,7 +348,7 @@ export default function AdminInvoicesPage() {
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="flex items-center gap-1">
             <FileText className="h-3 w-3" />
-            {pagination.total} total
+            {pagination?.total || 0} total
           </Badge>
           <Badge variant="outline" className="flex items-center gap-1">
             <DollarSign className="h-3 w-3" />

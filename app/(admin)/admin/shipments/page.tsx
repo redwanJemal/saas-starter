@@ -100,8 +100,8 @@ export default function AdminShipmentsPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
+        page: (pagination?.page || 1).toString(),
+        limit: (pagination?.limit || 20).toString(),
         ...(search && { search }),
         ...(statusFilter && { status: statusFilter }),
         ...(warehouseFilter && { warehouse_id: warehouseFilter })
@@ -321,7 +321,7 @@ export default function AdminShipmentsPage() {
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="flex items-center gap-1">
             <Package className="h-3 w-3" />
-            {pagination.total} total
+            {pagination?.total || 0} total
           </Badge>
         </div>
       </div>

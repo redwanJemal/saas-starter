@@ -117,8 +117,8 @@ export default function AdminCustomersPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
+        page: (pagination?.page || 1).toString(),
+        limit: (pagination?.limit || 20).toString(),
         ...(search && { search }),
         ...(kycStatusFilter && { kyc_status: kycStatusFilter }),
         ...(riskLevelFilter && { risk_level: riskLevelFilter }),
@@ -350,7 +350,7 @@ export default function AdminCustomersPage() {
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="flex items-center gap-1">
             <Users className="h-3 w-3" />
-            {pagination.total} total
+            {pagination?.total || 0} total
           </Badge>
           <Badge variant="outline" className="flex items-center gap-1">
             <DollarSign className="h-3 w-3" />

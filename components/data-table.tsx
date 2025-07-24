@@ -124,7 +124,7 @@ export function DataTable<TData, TValue>({
   const currentPage = isServerSidePagination ? pagination?.page || 1 : table.getState().pagination.pageIndex + 1;
   const totalPages = isServerSidePagination ? pagination?.pages || 1 : table.getPageCount();
   const pageSize = isServerSidePagination ? pagination?.limit || 20 : table.getState().pagination.pageSize;
-  const totalItems = isServerSidePagination ? pagination?.total || 0 : table.getFilteredRowModel().rows.length;
+  const totalItems = isServerSidePagination ? pagination?.total || 0 : table.getFilteredRowModel()?.rows?.length || 0;
 
   return (
     <Card>
@@ -216,7 +216,7 @@ export function DataTable<TData, TValue>({
                 </TableHeader>
                 <TableBody>
                   {table.getRowModel().rows?.length ? (
-                    table.getRowModel().rows.map((row) => (
+                    table.getRowModel().rows?.map((row) => (
                       <TableRow
                         key={row.id}
                         data-state={row.getIsSelected() && 'selected'}

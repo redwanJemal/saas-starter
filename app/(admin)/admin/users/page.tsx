@@ -102,8 +102,8 @@ export default function AdminUsersPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
+        page: (pagination?.page || 1).toString(),
+        limit: (pagination?.limit || 20).toString(),
         ...(search && { search }),
         ...(userTypeFilter && { user_type: userTypeFilter }),
         ...(statusFilter && { status: statusFilter })
@@ -330,7 +330,7 @@ export default function AdminUsersPage() {
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="flex items-center gap-1">
             <Users className="h-3 w-3" />
-            {pagination.total} total
+            {pagination?.total || 0} total
           </Badge>
           <Badge variant="outline" className="flex items-center gap-1">
             <Shield className="h-3 w-3" />
@@ -342,7 +342,7 @@ export default function AdminUsersPage() {
       <DataTable
         columns={columns}
         data={users}
-        searchKey="email"
+        searchKey="user"
         searchPlaceholder="Search users..."
         isLoading={loading}
         loadingMessage="Loading users..."
