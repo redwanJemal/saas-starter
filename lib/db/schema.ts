@@ -82,7 +82,13 @@ export const notificationStatusEnum = pgEnum('notification_status', [
 ]);
 export const companyTypeEnum = pgEnum('company_type', ['LLC', 'Corp', 'Ltd', 'Partnership', 'Sole_Proprietorship', 'Other']);
 export const verificationStatusEnum = pgEnum('verification_status', ['unverified', 'pending', 'verified', 'rejected']);
+export const incomingShipmentStatusEnum = pgEnum('incoming_shipment_status', [
+  'pending', 'scanning', 'scanned', 'assigned', 'received'
+]);
 
+export const itemAssignmentStatusEnum = pgEnum('item_assignment_status', [
+  'unassigned', 'assigned', 'received'
+]);
 // =============================================================================
 // TENANCY SYSTEM
 // =============================================================================
@@ -748,6 +754,114 @@ export const systemConfigs = pgTable('system_configs', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+export const countries = pgTable('countries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: varchar('code', { length: 2 }).unique().notNull(), // ISO 3166-1 alpha-2
+  name: varchar('name', { length: 255 }).notNull(),
+  region: varchar('region', { length: 100 }),
+  callingCode: varchar('calling_code', { length: 10 }),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Global reference table for currencies (tenant-independent)
+export const currencies = pgTable('currencies', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: varchar('code', { length: 3 }).unique().notNull(), // ISO 4217
+  name: varchar('name', { length: 255 }).notNull(),
+  symbol: varchar('symbol', { length: 10 }),
+  decimalPlaces: integer('decimal_places').default(2),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Global courier directory (tenant-independent)
+export const couriers = pgTable('couriers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  code: varchar('code', { length: 50 }).unique().notNull(),
+  websiteUrl: varchar('website_url', { length: 500 }),
+  trackingUrlTemplate: varchar('tracking_url_template', { length: 500 }),
+  supportedCountries: jsonb('supported_countries').$type<string[]>().default([]),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Tenant-specific currency configurations (many-to-many)
+export const tenantCurrencies = pgTable('tenant_currencies', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  currencyId: uuid('currency_id').references(() => currencies.id, { onDelete: 'cascade' }).notNull(),
+  isDefault: boolean('is_default').default(false),
+  exchangeRate: decimal('exchange_rate', { precision: 12, scale: 6 }).default('1.0'),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Tenant-specific courier configurations (many-to-many)
+export const tenantCouriers = pgTable('tenant_couriers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  courierId: uuid('courier_id').references(() => couriers.id, { onDelete: 'cascade' }).notNull(),
+  isActive: boolean('is_active').default(true),
+  contractDetails: jsonb('contract_details'),
+  apiCredentials: text('api_credentials'), // Encrypted
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Incoming shipments (pre-receiving phase)
+export const incomingShipments = pgTable('incoming_shipments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  warehouseId: uuid('warehouse_id').references(() => warehouses.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Batch identification
+  batchReference: varchar('batch_reference', { length: 100 }).notNull(),
+  
+  // Courier information
+  courierId: uuid('courier_id').references(() => couriers.id),
+  
+  // Shipment details
+  arrivalDate: date('arrival_date'),
+  totalPiecesExpected: integer('total_pieces_expected'),
+  manifestFileUrl: varchar('manifest_file_url', { length: 500 }),
+  
+  // Processing status
+  status: incomingShipmentStatusEnum('status').default('pending'),
+  scanCompletedAt: timestamp('scan_completed_at'),
+  
+  // Audit fields
+  createdBy: uuid('created_by').references(() => users.id).notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Scanned tracking numbers from incoming shipments
+export const incomingShipmentItems = pgTable('incoming_shipment_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  incomingShipmentId: uuid('incoming_shipment_id').references(() => incomingShipments.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Tracking information
+  trackingNumber: varchar('tracking_number', { length: 255 }).notNull(),
+  courierTrackingUrl: varchar('courier_tracking_url', { length: 500 }),
+  
+  // Scanning details
+  scannedAt: timestamp('scanned_at').notNull().defaultNow(),
+  scannedBy: uuid('scanned_by').references(() => users.id).notNull(),
+  
+  // Assignment status
+  assignmentStatus: itemAssignmentStatusEnum('assignment_status').default('unassigned'),
+  assignedCustomerProfileId: uuid('assigned_customer_profile_id').references(() => customerProfiles.id),
+  assignedAt: timestamp('assigned_at'),
+  assignedBy: uuid('assigned_by').references(() => users.id),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // =============================================================================
 // RELATIONS
 // =============================================================================
@@ -1067,6 +1181,80 @@ export const systemConfigsRelations = relations(systemConfigs, ({ one }) => ({
   }),
 }));
 
+export const countriesRelations = relations(countries, ({ many }) => ({
+  supportedByCouriers: many(couriers),
+}));
+
+export const currenciesRelations = relations(currencies, ({ many }) => ({
+  tenantCurrencies: many(tenantCurrencies),
+}));
+
+export const couriersRelations = relations(couriers, ({ many }) => ({
+  tenantCouriers: many(tenantCouriers),
+  incomingShipments: many(incomingShipments),
+}));
+
+export const tenantCurrenciesRelations = relations(tenantCurrencies, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [tenantCurrencies.tenantId],
+    references: [tenants.id],
+  }),
+  currency: one(currencies, {
+    fields: [tenantCurrencies.currencyId],
+    references: [currencies.id],
+  }),
+}));
+
+export const tenantCouriersRelations = relations(tenantCouriers, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [tenantCouriers.tenantId],
+    references: [tenants.id],
+  }),
+  courier: one(couriers, {
+    fields: [tenantCouriers.courierId],
+    references: [couriers.id],
+  }),
+}));
+
+export const incomingShipmentsRelations = relations(incomingShipments, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [incomingShipments.tenantId],
+    references: [tenants.id],
+  }),
+  warehouse: one(warehouses, {
+    fields: [incomingShipments.warehouseId],
+    references: [warehouses.id],
+  }),
+  courier: one(couriers, {
+    fields: [incomingShipments.courierId],
+    references: [couriers.id],
+  }),
+  createdByUser: one(users, {
+    fields: [incomingShipments.createdBy],
+    references: [users.id],
+  }),
+  items: many(incomingShipmentItems),
+}));
+
+export const incomingShipmentItemsRelations = relations(incomingShipmentItems, ({ one }) => ({
+  incomingShipment: one(incomingShipments, {
+    fields: [incomingShipmentItems.incomingShipmentId],
+    references: [incomingShipments.id],
+  }),
+  scannedByUser: one(users, {
+    fields: [incomingShipmentItems.scannedBy],
+    references: [users.id],
+  }),
+  assignedByUser: one(users, {
+    fields: [incomingShipmentItems.assignedBy],
+    references: [users.id],
+  }),
+  assignedCustomerProfile: one(customerProfiles, {
+    fields: [incomingShipmentItems.assignedCustomerProfileId],
+    references: [customerProfiles.id],
+  }),
+}));
+
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -1147,6 +1335,22 @@ export type NewActivityLog = typeof activityLogs.$inferInsert;
 
 export type SystemConfig = InferSelectModel<typeof systemConfigs>;
 export type NewSystemConfig = InferInsertModel<typeof systemConfigs>;
+
+export type Country = InferSelectModel<typeof countries>;
+export type Currency = InferSelectModel<typeof currencies>;
+export type Courier = InferSelectModel<typeof couriers>;
+export type TenantCurrency = InferSelectModel<typeof tenantCurrencies>;
+export type TenantCourier = InferSelectModel<typeof tenantCouriers>;
+export type IncomingShipment = InferSelectModel<typeof incomingShipments>;
+export type IncomingShipmentItem = InferSelectModel<typeof incomingShipmentItems>;
+
+export type InsertCountry = InferInsertModel<typeof countries>;
+export type InsertCurrency = InferInsertModel<typeof currencies>;
+export type InsertCourier = InferInsertModel<typeof couriers>;
+export type InsertTenantCurrency = InferInsertModel<typeof tenantCurrencies>;
+export type InsertTenantCourier = InferInsertModel<typeof tenantCouriers>;
+export type InsertIncomingShipment = InferInsertModel<typeof incomingShipments>;
+export type InsertIncomingShipmentItem = InferInsertModel<typeof incomingShipmentItems>;
 
 // =============================================================================
 // COMPLEX TYPES FOR QUERIES

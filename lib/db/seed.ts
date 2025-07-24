@@ -16,11 +16,16 @@ import {
   type CustomerProfile,
 } from './schema';
 import { hashPassword } from '@/lib/auth/session';
+import { seedMasterData } from './seed-master-data';
 
 async function seed() {
   console.log('🌱 Starting database seed...');
+  
+  // 1. Seed master data first (countries, currencies, couriers)
+  console.log('📊 Step 1: Seeding master data...');
+  await seedMasterData();
 
-  // 1. Create default tenant
+  // 2. Create default tenant
   const [defaultTenant] = await db.insert(tenants).values({
     name: 'Package Forwarding Platform',
     slug: DEFAULT_TENANT_SLUG,
@@ -30,7 +35,7 @@ async function seed() {
 
   console.log('✅ Default tenant created');
 
-  // 2. Create permissions
+  // 3. Create permissions
   const permissionData = [
     // Package permissions
     { name: 'View Packages', slug: 'packages.read', category: 'packages', action: 'read' },
@@ -64,7 +69,7 @@ async function seed() {
   const createdPermissions = await db.insert(permissions).values(permissionData).returning();
   console.log('✅ Permissions created');
 
-  // 3. Create roles
+  // 4. Create roles
   const roleData = [
     { tenantId: defaultTenant.id, name: 'Customer', slug: 'customer', description: 'Regular platform customer', roleType: 'customer' as const, isSystemRole: true },
     { tenantId: defaultTenant.id, name: 'Warehouse Staff', slug: 'warehouse_staff', description: 'Warehouse operations staff', roleType: 'staff' as const, isSystemRole: true },
@@ -76,7 +81,7 @@ async function seed() {
   const createdRoles = await db.insert(roles).values(roleData).returning();
   console.log('✅ Roles created');
 
-  // 4. Assign permissions to roles
+  // 5. Assign permissions to roles
   const rolePermissionMappings = [
     // Customer permissions
     {
@@ -136,7 +141,7 @@ async function seed() {
 
   console.log('✅ Role permissions assigned');
 
-  // 5. Create default warehouse
+  // 6. Create default warehouse
   const [defaultWarehouse] = await db.insert(warehouses).values({
     tenantId: defaultTenant.id,
     code: 'UK1',
@@ -160,7 +165,7 @@ async function seed() {
 
   console.log('✅ Default warehouse created');
 
-  // 6. Create system configurations
+  // 7. Create system configurations
   const configData = [
     { tenantId: defaultTenant.id, configKey: 'platform_name', configValue: 'Package Forwarding Platform', configType: 'string', description: 'Platform display name', isPublic: true },
     { tenantId: defaultTenant.id, configKey: 'support_email', configValue: 'support@platform.com', configType: 'string', description: 'Support contact email', isPublic: true },
@@ -178,7 +183,7 @@ async function seed() {
   await db.insert(systemConfigs).values(configData);
   console.log('✅ System configurations created');
 
-  // 7. Create admin user
+  // 8. Create admin user
   const adminPasswordHash = await hashPassword('admin123');
   const [adminUser] = await db.insert(users).values({
     tenantId: defaultTenant.id,
@@ -202,7 +207,7 @@ async function seed() {
 
   console.log('✅ Admin user created: admin@platform.com / admin123');
 
-  // 8. Create sample customer
+  // 9. Create sample customer
   const customerPasswordHash = await hashPassword('customer123');
   const [customerUser] = await db.insert(users).values({
     tenantId: defaultTenant.id,
@@ -255,7 +260,7 @@ async function seed() {
   console.log(`   Customer ID: ${customerProfile.customerId}`);
   console.log(`   Suite Code: ${customerProfile.customerId}`);
 
-  // 9. Create warehouse staff user
+  // 10. Create warehouse staff user
   const warehouseStaffPasswordHash = await hashPassword('warehouse123');
   const [warehouseStaffUser] = await db.insert(users).values({
     tenantId: defaultTenant.id,
