@@ -1,3 +1,4 @@
+// app/api/admin/warehouses/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
 import { warehouses, packages, shipments } from '@/lib/db/schema';
@@ -14,12 +15,10 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || '';
-
     const offset = (page - 1) * limit;
 
     // Build where conditions
     let whereConditions = [];
-
     if (search) {
       whereConditions.push(
         or(
@@ -29,15 +28,13 @@ export async function GET(request: NextRequest) {
         )
       );
     }
-
     if (status) {
       whereConditions.push(eq(warehouses.status, status as any));
     }
 
     // Combine conditions
-    const whereClause = whereConditions.length > 0 
-      ? sql`${whereConditions.reduce((acc, condition) => sql`${acc} AND ${condition}`)}` 
-      : undefined;
+    const whereClause = whereConditions.length > 0 ?
+      sql`${whereConditions.reduce((acc, condition) => sql`${acc} AND ${condition}`)}` : undefined;
 
     // Get warehouses with stats
     const warehousesQuery = db
@@ -58,7 +55,6 @@ export async function GET(request: NextRequest) {
         maxPackageValue: warehouses.maxPackageValue,
         acceptsNewPackages: warehouses.acceptsNewPackages,
         createdAt: warehouses.createdAt,
-        // Stats will be added separately
       })
       .from(warehouses)
       .orderBy(desc(warehouses.createdAt))
@@ -125,6 +121,76 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching admin warehouses:', error);
     return NextResponse.json(
       { error: 'Failed to fetch warehouses' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    // Check permission
+    const adminUser = await requirePermission('warehouses.manage');
+
+    const body = await request.json();
+    
+    // Validate required fields
+    const requiredFields = ['name', 'code', 'addressLine1', 'city', 'postalCode', 'countryCode', 'currencyCode'];
+    for (const field of requiredFields) {
+      if (!body[field]) {
+        return NextResponse.json(
+          { error: `Missing required field: ${field}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Check if warehouse code already exists
+    const existingWarehouse = await db
+      .select({ id: warehouses.id })
+      .from(warehouses)
+      .where(eq(warehouses.code, body.code))
+      .limit(1);
+
+    if (existingWarehouse.length > 0) {
+      return NextResponse.json(
+        { error: 'Warehouse code already exists' },
+        { status: 400 }
+      );
+    }
+
+    // Create warehouse
+    const [newWarehouse] = await db
+      .insert(warehouses)
+      .values({
+        tenantId: adminUser.tenantId,
+        name: body.name,
+        code: body.code.toUpperCase(),
+        description: body.description || null,
+        addressLine1: body.addressLine1,
+        addressLine2: body.addressLine2 || null,
+        city: body.city,
+        stateProvince: body.stateProvince || null,
+        postalCode: body.postalCode,
+        countryCode: body.countryCode,
+        phone: body.phone || null,
+        email: body.email || null,
+        timezone: body.timezone || 'UTC',
+        currencyCode: body.currencyCode,
+        taxTreatment: body.taxTreatment || 'standard',
+        storageFreeDays: body.storageFreeDays || 30,
+        storageFeePerDay: body.storageFeePerDay || '1.00',
+        maxPackageWeightKg: body.maxPackageWeightKg || '30.00',
+        maxPackageValue: body.maxPackageValue || '10000.00',
+        status: 'active',
+        acceptsNewPackages: body.acceptsNewPackages !== false,
+      })
+      .returning();
+
+    return NextResponse.json(newWarehouse, { status: 201 });
+  } catch (error) {
+    console.error('Error creating warehouse:', error);
+    return NextResponse.json(
+      { error: 'Failed to create warehouse' },
       { status: 500 }
     );
   }

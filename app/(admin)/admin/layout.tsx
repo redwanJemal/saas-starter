@@ -93,7 +93,7 @@ const adminNavItems: AdminNavItem[] = [
     section: 'Operations'
   },
   { 
-    href: '/admin/warehouse', 
+    href: '/admin/warehouses', 
     icon: Warehouse, 
     label: 'Warehouses', 
     description: 'Warehouse operations',

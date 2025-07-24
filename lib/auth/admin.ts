@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 
 export type AdminUser = {
   id: string;
+  tenantId: string;
   email: string;
   firstName: string | null;
   lastName: string | null;
@@ -59,6 +60,7 @@ export async function getAdminUser(): Promise<AdminUser | null> {
 
   const adminUser: AdminUser = {
     id: user.id,
+    tenantId: user.tenantId,
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
