@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
 import { incomingShipments, incomingShipmentItems, couriers } from '@/lib/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, and } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
 
 export async function POST(request: NextRequest) {
@@ -82,7 +82,10 @@ export async function POST(request: NextRequest) {
         updatedAt: sql`now()`,
       })
       .where(
-        sql`${incomingShipments.id} = ${incomingShipmentId} AND ${incomingShipments.status} = 'pending'`
+        and(
+          eq(incomingShipments.id, incomingShipmentId),
+          eq(incomingShipments.status, 'pending')
+        )
       );
 
     return NextResponse.json({

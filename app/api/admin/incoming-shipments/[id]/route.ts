@@ -21,11 +21,12 @@ export async function GET(
         id: incomingShipments.id,
         batchReference: incomingShipments.batchReference,
         courierId: incomingShipments.courierId,
+        courierName: incomingShipments.courierName,
         arrivalDate: incomingShipments.arrivalDate,
-        totalPiecesExpected: incomingShipments.totalPiecesExpected,
-        manifestFileUrl: incomingShipments.manifestFileUrl,
         status: incomingShipments.status,
-        scanCompletedAt: incomingShipments.scanCompletedAt,
+        receivedBy: incomingShipments.receivedBy,
+        receivedAt: incomingShipments.receivedAt,
+        notes: incomingShipments.notes,
         createdAt: incomingShipments.createdAt,
         updatedAt: incomingShipments.updatedAt,
       })
@@ -78,7 +79,7 @@ export async function PATCH(
 
     const body = await request.json();
     const { status, scanCompletedAt, manifestFileUrl } = body;
-    const shipmentId = params.id;
+    const shipmentId = (await params).id;
 
     console.log('🔄 PATCH incoming shipment:', { shipmentId, status, scanCompletedAt });
 
@@ -103,22 +104,10 @@ export async function PATCH(
 
     console.log('✅ Found existing shipment:', existingShipment);
 
-    // Prepare update data
-    const updateData: any = {
-      updatedAt: sql`now()`,
+    // Prepare update data with proper typing
+    const updateData: Record<string, any> = {
+      updatedAt: sql`now()`
     };
-
-    if (status) {
-      updateData.status = status;
-    }
-
-    if (scanCompletedAt) {
-      updateData.scanCompletedAt = new Date(scanCompletedAt);
-    }
-
-    if (manifestFileUrl !== undefined) {
-      updateData.manifestFileUrl = manifestFileUrl;
-    }
 
     console.log('📝 Update data:', updateData);
 
@@ -131,7 +120,7 @@ export async function PATCH(
         id: incomingShipments.id,
         batchReference: incomingShipments.batchReference,
         status: incomingShipments.status,
-        scanCompletedAt: incomingShipments.scanCompletedAt,
+        processedAt: incomingShipments.processedAt,
         updatedAt: incomingShipments.updatedAt,
       });
 
