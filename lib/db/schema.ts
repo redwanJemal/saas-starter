@@ -399,52 +399,54 @@ export const packages = pgTable('packages', {
   customerProfileId: uuid('customer_profile_id').references(() => customerProfiles.id, { onDelete: 'cascade' }).notNull(),
   warehouseId: uuid('warehouse_id').references(() => warehouses.id, { onDelete: 'cascade' }).notNull(),
   
+  // Link to incoming shipment item
+  incomingShipmentItemId: uuid('incoming_shipment_item_id').references(() => incomingShipmentItems.id),
+  
   // Package identification
   internalId: varchar('internal_id', { length: 50 }).unique().notNull(),
   suiteCodeCaptured: varchar('suite_code_captured', { length: 50 }),
-  trackingNumberInbound: varchar('tracking_number_inbound', { length: 255 }),
   
-  // Sender information
+  // Inbound tracking
+  trackingNumberInbound: varchar('tracking_number_inbound', { length: 255 }),
   senderName: varchar('sender_name', { length: 255 }),
   senderCompany: varchar('sender_company', { length: 255 }),
   senderTrackingUrl: varchar('sender_tracking_url', { length: 500 }),
   
   // Package details
   description: text('description'),
-  estimatedValue: decimal('estimated_value', { precision: 12, scale: 2 }),
+  estimatedValue: decimal('estimated_value', { precision: 12, scale: 2 }).default('0'),
   estimatedValueCurrency: varchar('estimated_value_currency', { length: 3 }).default('USD'),
   
-  // Physical properties
+  // Physical properties - Using decimal for proper type handling
   weightActualKg: decimal('weight_actual_kg', { precision: 8, scale: 3 }),
   lengthCm: decimal('length_cm', { precision: 8, scale: 2 }),
   widthCm: decimal('width_cm', { precision: 8, scale: 2 }),
   heightCm: decimal('height_cm', { precision: 8, scale: 2 }),
   volumetricWeightKg: decimal('volumetric_weight_kg', { precision: 8, scale: 3 }),
   
-  // Status tracking
+  // Status and dates
   status: packageStatusEnum('status').default('expected'),
-  
-  // Important dates
   expectedArrivalDate: date('expected_arrival_date'),
   receivedAt: timestamp('received_at'),
   readyToShipAt: timestamp('ready_to_ship_at'),
   storageExpiresAt: timestamp('storage_expires_at'),
   
-  // Processing notes
+  // Notes and instructions
   warehouseNotes: text('warehouse_notes'),
   customerNotes: text('customer_notes'),
   specialInstructions: text('special_instructions'),
   
-  // Flags
+  // Package characteristics
   isFragile: boolean('is_fragile').default(false),
   isHighValue: boolean('is_high_value').default(false),
   requiresAdultSignature: boolean('requires_adult_signature').default(false),
   isRestricted: boolean('is_restricted').default(false),
   
-  // Processing details
+  // Processing info
   processedBy: uuid('processed_by').references(() => users.id),
   processedAt: timestamp('processed_at'),
   
+  // Timestamps
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -452,34 +454,23 @@ export const packages = pgTable('packages', {
 export const packageDocuments = pgTable('package_documents', {
   id: uuid('id').primaryKey().defaultRandom(),
   packageId: uuid('package_id').references(() => packages.id, { onDelete: 'cascade' }).notNull(),
-  
   documentType: varchar('document_type', { length: 50 }).notNull(),
   fileName: varchar('file_name', { length: 255 }).notNull(),
-  fileUrl: varchar('file_url', { length: 500 }).notNull(),
-  fileSizeBytes: integer('file_size_bytes'),
+  fileSize: integer('file_size'),
   mimeType: varchar('mime_type', { length: 100 }),
-  
-  // Categorization
-  isPublic: boolean('is_public').default(true),
-  displayOrder: integer('display_order').default(0),
-  
-  // Metadata
+  fileUrl: varchar('file_url', { length: 500 }),
   uploadedBy: uuid('uploaded_by').references(() => users.id),
-  uploadNotes: text('upload_notes'),
-  
-  createdAt: timestamp('created_at').notNull().defaultNow(),
+  uploadedAt: timestamp('uploaded_at').notNull().defaultNow(),
 });
+
 
 export const packageStatusHistory = pgTable('package_status_history', {
   id: uuid('id').primaryKey().defaultRandom(),
   packageId: uuid('package_id').references(() => packages.id, { onDelete: 'cascade' }).notNull(),
-  
   status: packageStatusEnum('status').notNull(),
   notes: text('notes'),
-  
   changedBy: uuid('changed_by').references(() => users.id),
   changeReason: varchar('change_reason', { length: 255 }),
-  
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -818,46 +809,80 @@ export const incomingShipments = pgTable('incoming_shipments', {
   tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
   warehouseId: uuid('warehouse_id').references(() => warehouses.id, { onDelete: 'cascade' }).notNull(),
   
-  // Batch identification
+  // Shipment identification
   batchReference: varchar('batch_reference', { length: 100 }).notNull(),
   
-  // Courier information
-  courierId: uuid('courier_id').references(() => couriers.id),
+  // Courier info
+  courierId: uuid('courier_id').references(() => couriers.id), // Added missing field
+  courierName: varchar('courier_name', { length: 255 }),
+  trackingNumber: varchar('tracking_number', { length: 255 }),
   
-  // Shipment details
-  arrivalDate: date('arrival_date'),
-  totalPiecesExpected: integer('total_pieces_expected'),
-  manifestFileUrl: varchar('manifest_file_url', { length: 500 }),
+  // Dates
+  arrivalDate: date('arrival_date'), // Added missing field
+  expectedArrivalDate: date('expected_arrival_date'),
+  actualArrivalDate: date('actual_arrival_date'),
   
-  // Processing status
-  status: incomingShipmentStatusEnum('status').default('pending'),
-  scanCompletedAt: timestamp('scan_completed_at'),
+  // Status and processing
+  status: varchar('status', { length: 50 }).default('pending'),
+  receivedBy: uuid('received_by').references(() => users.id),
+  receivedAt: timestamp('received_at'),
+  processedBy: uuid('processed_by').references(() => users.id),
+  processedAt: timestamp('processed_at'),
   
-  // Audit fields
-  createdBy: uuid('created_by').references(() => users.id).notNull(),
+  // Notes
+  notes: text('notes'),
+  
+  // Timestamps
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
 // Scanned tracking numbers from incoming shipments
+// Add incoming shipment items table if not exists
 export const incomingShipmentItems = pgTable('incoming_shipment_items', {
   id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  warehouseId: uuid('warehouse_id').references(() => warehouses.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Fixed: Add missing incomingShipmentId field
   incomingShipmentId: uuid('incoming_shipment_id').references(() => incomingShipments.id, { onDelete: 'cascade' }).notNull(),
   
-  // Tracking information
-  trackingNumber: varchar('tracking_number', { length: 255 }).notNull(),
+  // Tracking and courier info
+  trackingNumber: varchar('tracking_number', { length: 255 }),
+  courierName: varchar('courier_name', { length: 255 }),
   courierTrackingUrl: varchar('courier_tracking_url', { length: 500 }),
   
-  // Scanning details
-  scannedAt: timestamp('scanned_at').notNull().defaultNow(),
-  scannedBy: uuid('scanned_by').references(() => users.id).notNull(),
+  // Scanning info - Fixed: Add missing scannedBy field
+  scannedBy: uuid('scanned_by').references(() => users.id),
+  scannedAt: timestamp('scanned_at'),
   
-  // Assignment status
-  assignmentStatus: itemAssignmentStatusEnum('assignment_status').default('unassigned'),
+  // Assignment info - Fixed: Add missing assignedBy field
   assignedCustomerProfileId: uuid('assigned_customer_profile_id').references(() => customerProfiles.id),
-  assignedAt: timestamp('assigned_at'),
   assignedBy: uuid('assigned_by').references(() => users.id),
+  assignedAt: timestamp('assigned_at'),
+  assignmentStatus: varchar('assignment_status', { length: 50 }).default('pending'),
   
+  // Physical properties
+  weightKg: decimal('weight_kg', { precision: 8, scale: 3 }),
+  lengthCm: decimal('length_cm', { precision: 8, scale: 2 }),
+  widthCm: decimal('width_cm', { precision: 8, scale: 2 }),
+  heightCm: decimal('height_cm', { precision: 8, scale: 2 }),
+  
+  // Package info
+  description: text('description'),
+  estimatedValue: decimal('estimated_value', { precision: 12, scale: 2 }),
+  estimatedValueCurrency: varchar('estimated_value_currency', { length: 3 }).default('USD'),
+  
+  // Processing notes
+  notes: text('notes'),
+  specialInstructions: text('special_instructions'),
+  
+  // Status flags
+  isFragile: boolean('is_fragile').default(false),
+  isHighValue: boolean('is_high_value').default(false),
+  requiresInspection: boolean('requires_inspection').default(false),
+  
+  // Timestamps
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -885,24 +910,16 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     fields: [users.tenantId],
     references: [tenants.id],
   }),
-  customerProfile: one(customerProfiles),
-  
-  // Explicitly name the user roles relation to match the other side
-  userRoles: many(userRoles, {
-    relationName: 'userRoleAssignments'
+  customerProfile: one(customerProfiles, {
+    fields: [users.id],
+    references: [customerProfiles.userId],
   }),
-  
-  // Keep other relations as they are
-  packagesProcessed: many(packages),
-  shipmentsCreated: many(shipments),
-  documentsUploaded: many(packageDocuments),
-  statusChanges: many(packageStatusHistory),
-  activityLogs: many(activityLogs),
-  
-  // Add relation for roles assigned by this user
-  rolesAssigned: many(userRoles, {
-    relationName: 'roleAssignments'
-  }),
+  userRoles: many(userRoles, { relationName: 'userRoleAssignments' }),
+  processedPackages: many(packages),
+  packageStatusChanges: many(packageStatusHistory),
+  uploadedDocuments: many(packageDocuments),
+  scannedIncomingItems: many(incomingShipmentItems),
+  assignedIncomingItems: many(incomingShipmentItems),
 }));
 
 export const rolesRelations = relations(roles, ({ one, many }) => ({
@@ -911,7 +928,7 @@ export const rolesRelations = relations(roles, ({ one, many }) => ({
     references: [tenants.id],
   }),
   rolePermissions: many(rolePermissions),
-  userRoles: many(userRoles),
+  userRoles: many(userRoles, { relationName: 'userRoleAssignments' }),
 }));
 
 export const permissionsRelations = relations(permissions, ({ many }) => ({
@@ -956,19 +973,9 @@ export const customerProfilesRelations = relations(customerProfiles, ({ one, man
     fields: [customerProfiles.tenantId],
     references: [tenants.id],
   }),
-  referrer: one(customerProfiles, {
-    fields: [customerProfiles.referredBy],
-    references: [customerProfiles.id],
-  }),
-  companies: many(companies),
-  addresses: many(addresses),
   packages: many(packages),
-  shipments: many(shipments),
-  financialInvoices: many(financialInvoices),
   warehouseAssignments: many(customerWarehouseAssignments),
-  notificationPreferences: many(notificationPreferences),
-  notificationLogs: many(notificationLogs),
-  activityLogs: many(activityLogs),
+  addresses: many(addresses),
 }));
 
 export const companiesRelations = relations(companies, ({ one, many }) => ({
@@ -1019,10 +1026,6 @@ export const addressesRelations = relations(addresses, ({ one, many }) => ({
 }));
 
 export const packagesRelations = relations(packages, ({ one, many }) => ({
-  tenant: one(tenants, {
-    fields: [packages.tenantId],
-    references: [tenants.id],
-  }),
   customerProfile: one(customerProfiles, {
     fields: [packages.customerProfileId],
     references: [customerProfiles.id],
@@ -1031,14 +1034,22 @@ export const packagesRelations = relations(packages, ({ one, many }) => ({
     fields: [packages.warehouseId],
     references: [warehouses.id],
   }),
+  tenant: one(tenants, {
+    fields: [packages.tenantId],
+    references: [tenants.id],
+  }),
+  incomingShipmentItem: one(incomingShipmentItems, {
+    fields: [packages.incomingShipmentItemId],
+    references: [incomingShipmentItems.id],
+  }),
   processedByUser: one(users, {
     fields: [packages.processedBy],
     references: [users.id],
   }),
-  documents: many(packageDocuments),
   statusHistory: many(packageStatusHistory),
-  shipmentPackages: many(shipmentPackages),
+  documents: many(packageDocuments),
 }));
+
 
 export const packageDocumentsRelations = relations(packageDocuments, ({ one }) => ({
   package: one(packages, {
@@ -1217,20 +1228,24 @@ export const tenantCouriersRelations = relations(tenantCouriers, ({ one }) => ({
 }));
 
 export const incomingShipmentsRelations = relations(incomingShipments, ({ one, many }) => ({
-  tenant: one(tenants, {
-    fields: [incomingShipments.tenantId],
-    references: [tenants.id],
-  }),
   warehouse: one(warehouses, {
     fields: [incomingShipments.warehouseId],
     references: [warehouses.id],
   }),
-  courier: one(couriers, {
+  tenant: one(tenants, {
+    fields: [incomingShipments.tenantId],
+    references: [tenants.id],
+  }),
+  courier: one(couriers, { // Added courier relation
     fields: [incomingShipments.courierId],
     references: [couriers.id],
   }),
-  createdByUser: one(users, {
-    fields: [incomingShipments.createdBy],
+  receivedByUser: one(users, {
+    fields: [incomingShipments.receivedBy],
+    references: [users.id],
+  }),
+  processedByUser: one(users, {
+    fields: [incomingShipments.processedBy],
     references: [users.id],
   }),
   items: many(incomingShipmentItems),
@@ -1238,20 +1253,28 @@ export const incomingShipmentsRelations = relations(incomingShipments, ({ one, m
 
 export const incomingShipmentItemsRelations = relations(incomingShipmentItems, ({ one }) => ({
   incomingShipment: one(incomingShipments, {
-    fields: [incomingShipmentItems.incomingShipmentId],
+    fields: [incomingShipmentItems.incomingShipmentId], // Fixed: now exists
     references: [incomingShipments.id],
   }),
   scannedByUser: one(users, {
-    fields: [incomingShipmentItems.scannedBy],
+    fields: [incomingShipmentItems.scannedBy], // Fixed: now exists
     references: [users.id],
   }),
   assignedByUser: one(users, {
-    fields: [incomingShipmentItems.assignedBy],
+    fields: [incomingShipmentItems.assignedBy], // Fixed: now exists
     references: [users.id],
   }),
   assignedCustomerProfile: one(customerProfiles, {
     fields: [incomingShipmentItems.assignedCustomerProfileId],
     references: [customerProfiles.id],
+  }),
+  warehouse: one(warehouses, {
+    fields: [incomingShipmentItems.warehouseId],
+    references: [warehouses.id],
+  }),
+  tenant: one(tenants, {
+    fields: [incomingShipmentItems.tenantId],
+    references: [tenants.id],
   }),
 }));
 

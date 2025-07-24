@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
         id: incomingShipments.id,
         courierId: incomingShipments.courierId,
         trackingUrlTemplate: couriers.trackingUrlTemplate,
+        tenantId: incomingShipments.tenantId,
+        warehouseId: incomingShipments.warehouseId,
       })
       .from(incomingShipments)
       .leftJoin(couriers, eq(incomingShipments.courierId, couriers.id))
@@ -49,6 +51,8 @@ export async function POST(request: NextRequest) {
           : null;
 
         return {
+          tenantId: shipment.tenantId,
+          warehouseId: shipment.warehouseId,
           incomingShipmentId,
           trackingNumber: trackingNumber.trim(),
           courierTrackingUrl,

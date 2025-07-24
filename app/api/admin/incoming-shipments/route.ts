@@ -53,19 +53,19 @@ export async function GET(request: NextRequest) {
         id: incomingShipments.id,
         batchReference: incomingShipments.batchReference,
         courierId: incomingShipments.courierId,
-        courierName: couriers.name,
+        courierName: incomingShipments.courierName,
+        trackingNumber: incomingShipments.trackingNumber,
         arrivalDate: incomingShipments.arrivalDate,
-        totalPiecesExpected: incomingShipments.totalPiecesExpected,
-        manifestFileUrl: incomingShipments.manifestFileUrl,
-        scanCompletedAt: incomingShipments.scanCompletedAt,
         status: incomingShipments.status,
+        receivedAt: incomingShipments.receivedAt,
+        processedAt: incomingShipments.processedAt,
+        notes: incomingShipments.notes,
         createdAt: incomingShipments.createdAt,
         updatedAt: incomingShipments.updatedAt,
         warehouseName: warehouses.name,
         warehouseCode: warehouses.code,
       })
       .from(incomingShipments)
-      .leftJoin(couriers, eq(incomingShipments.courierId, couriers.id))
       .leftJoin(warehouses, eq(incomingShipments.warehouseId, warehouses.id))
       .orderBy(desc(incomingShipments.createdAt))
       .limit(limit)
@@ -168,15 +168,16 @@ export async function POST(request: NextRequest) {
     const [newShipment] = await db
       .insert(incomingShipments)
       .values({
-        tenantId: adminUser.tenantId, // From authenticated admin user
+        tenantId: adminUser.tenantId, 
         warehouseId: selectedWarehouseId,
         batchReference,
         courierId,
-        arrivalDate: new Date(arrivalDate).toISOString(),
-        totalPiecesExpected: parseInt(totalPiecesExpected),
-        manifestFileUrl,
+        courierName: courier.name,
+        arrivalDate: sql`${arrivalDate}::date`,
         status: 'pending',
-        createdBy: adminUser.id,
+        receivedBy: adminUser.id,
+        receivedAt: sql`NOW()`,
+        notes: totalPiecesExpected ? `Expected pieces: ${totalPiecesExpected}` : '',
       })
       .returning()
 

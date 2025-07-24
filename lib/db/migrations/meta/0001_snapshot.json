@@ -1,6 +1,6 @@
 {
-  "id": "d41296d3-fc8a-4195-a867-9e4fc6f2d1ac",
-  "prevId": "1cce4c61-2cdf-447c-8171-61b88e790f12",
+  "id": "896ded07-9844-4917-b05f-d736bdb15211",
+  "prevId": "508b9b48-ae17-4d5b-86d4-94e129319889",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1348,6 +1348,18 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "warehouse_id": {
+          "name": "warehouse_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
         "incoming_shipment_id": {
           "name": "incoming_shipment_id",
           "type": "uuid",
@@ -1358,7 +1370,13 @@
           "name": "tracking_number",
           "type": "varchar(255)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "courier_name": {
+          "name": "courier_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
         },
         "courier_tracking_url": {
           "name": "courier_tracking_url",
@@ -1366,29 +1384,26 @@
           "primaryKey": false,
           "notNull": false
         },
-        "scanned_at": {
-          "name": "scanned_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
         "scanned_by": {
           "name": "scanned_by",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "assignment_status": {
-          "name": "assignment_status",
-          "type": "item_assignment_status",
-          "typeSchema": "public",
+        "scanned_at": {
+          "name": "scanned_at",
+          "type": "timestamp",
           "primaryKey": false,
-          "notNull": false,
-          "default": "'unassigned'"
+          "notNull": false
         },
         "assigned_customer_profile_id": {
           "name": "assigned_customer_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assigned_by": {
+          "name": "assigned_by",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -1399,11 +1414,88 @@
           "primaryKey": false,
           "notNull": false
         },
-        "assigned_by": {
-          "name": "assigned_by",
-          "type": "uuid",
+        "assignment_status": {
+          "name": "assignment_status",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'pending'"
+        },
+        "weight_kg": {
+          "name": "weight_kg",
+          "type": "numeric(8, 3)",
           "primaryKey": false,
           "notNull": false
+        },
+        "length_cm": {
+          "name": "length_cm",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "width_cm": {
+          "name": "width_cm",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "height_cm": {
+          "name": "height_cm",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "estimated_value": {
+          "name": "estimated_value",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "estimated_value_currency": {
+          "name": "estimated_value_currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'USD'"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "special_instructions": {
+          "name": "special_instructions",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_fragile": {
+          "name": "is_fragile",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "is_high_value": {
+          "name": "is_high_value",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "requires_inspection": {
+          "name": "requires_inspection",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -1422,6 +1514,32 @@
       },
       "indexes": {},
       "foreignKeys": {
+        "incoming_shipment_items_tenant_id_tenants_id_fk": {
+          "name": "incoming_shipment_items_tenant_id_tenants_id_fk",
+          "tableFrom": "incoming_shipment_items",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "incoming_shipment_items_warehouse_id_warehouses_id_fk": {
+          "name": "incoming_shipment_items_warehouse_id_warehouses_id_fk",
+          "tableFrom": "incoming_shipment_items",
+          "tableTo": "warehouses",
+          "columnsFrom": [
+            "warehouse_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
         "incoming_shipment_items_incoming_shipment_id_incoming_shipments_id_fk": {
           "name": "incoming_shipment_items_incoming_shipment_id_incoming_shipments_id_fk",
           "tableFrom": "incoming_shipment_items",
@@ -1516,43 +1634,72 @@
           "primaryKey": false,
           "notNull": false
         },
+        "courier_name": {
+          "name": "courier_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tracking_number": {
+          "name": "tracking_number",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "arrival_date": {
           "name": "arrival_date",
           "type": "date",
           "primaryKey": false,
           "notNull": false
         },
-        "total_pieces_expected": {
-          "name": "total_pieces_expected",
-          "type": "integer",
+        "expected_arrival_date": {
+          "name": "expected_arrival_date",
+          "type": "date",
           "primaryKey": false,
           "notNull": false
         },
-        "manifest_file_url": {
-          "name": "manifest_file_url",
-          "type": "varchar(500)",
+        "actual_arrival_date": {
+          "name": "actual_arrival_date",
+          "type": "date",
           "primaryKey": false,
           "notNull": false
         },
         "status": {
           "name": "status",
-          "type": "incoming_shipment_status",
-          "typeSchema": "public",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "default": "'pending'"
         },
-        "scan_completed_at": {
-          "name": "scan_completed_at",
+        "received_by": {
+          "name": "received_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "received_at": {
+          "name": "received_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
-        "created_by": {
-          "name": "created_by",
+        "processed_by": {
+          "name": "processed_by",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "processed_at": {
+          "name": "processed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -1610,12 +1757,25 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "incoming_shipments_created_by_users_id_fk": {
-          "name": "incoming_shipments_created_by_users_id_fk",
+        "incoming_shipments_received_by_users_id_fk": {
+          "name": "incoming_shipments_received_by_users_id_fk",
           "tableFrom": "incoming_shipments",
           "tableTo": "users",
           "columnsFrom": [
-            "created_by"
+            "received_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "incoming_shipments_processed_by_users_id_fk": {
+          "name": "incoming_shipments_processed_by_users_id_fk",
+          "tableFrom": "incoming_shipments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "processed_by"
           ],
           "columnsTo": [
             "id"
@@ -1937,14 +2097,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "file_url": {
-          "name": "file_url",
-          "type": "varchar(500)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "file_size_bytes": {
-          "name": "file_size_bytes",
+        "file_size": {
+          "name": "file_size",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -1955,19 +2109,11 @@
           "primaryKey": false,
           "notNull": false
         },
-        "is_public": {
-          "name": "is_public",
-          "type": "boolean",
+        "file_url": {
+          "name": "file_url",
+          "type": "varchar(500)",
           "primaryKey": false,
-          "notNull": false,
-          "default": true
-        },
-        "display_order": {
-          "name": "display_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
+          "notNull": false
         },
         "uploaded_by": {
           "name": "uploaded_by",
@@ -1975,14 +2121,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "upload_notes": {
-          "name": "upload_notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
+        "uploaded_at": {
+          "name": "uploaded_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
@@ -2138,6 +2278,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "incoming_shipment_item_id": {
+          "name": "incoming_shipment_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "internal_id": {
           "name": "internal_id",
           "type": "varchar(50)",
@@ -2184,7 +2330,8 @@
           "name": "estimated_value",
           "type": "numeric(12, 2)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "'0'"
         },
         "estimated_value_currency": {
           "name": "estimated_value_currency",
@@ -2367,6 +2514,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "packages_incoming_shipment_item_id_incoming_shipment_items_id_fk": {
+          "name": "packages_incoming_shipment_item_id_incoming_shipment_items_id_fk",
+          "tableFrom": "packages",
+          "tableTo": "incoming_shipment_items",
+          "columnsFrom": [
+            "incoming_shipment_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         },
         "packages_processed_by_users_id_fk": {

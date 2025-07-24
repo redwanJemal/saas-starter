@@ -1,25 +1,22 @@
+// app/api/admin/packages/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
-import { packages, customerProfiles, users, warehouses, packageStatusHistory } from '@/lib/db/schema';
-import { desc, eq, ilike, or, sql } from 'drizzle-orm';
+import { 
+  packages, 
+  customerProfiles, 
+  users, 
+  warehouses, 
+  packageStatusHistory,
+  incomingShipmentItems 
+} from '@/lib/db/schema';
+import { desc, eq, and, or, ilike, sql } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 Admin packages API called');
-    
-    // Add detailed error logging for auth
-    let adminUser;
-    try {
-      adminUser = await requirePermission('packages.read');
-      console.log('✅ Admin auth successful:', adminUser.email);
-    } catch (authError) {
-      console.error('❌ Admin auth failed:', authError);
-      return NextResponse.json(
-        { error: 'Authentication failed', details: authError instanceof Error ? authError.message : 'Unknown auth error' },
-        { status: 401 }
-      );
-    }
+    // Check permission
+    await requirePermission('packages.read');
 
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get('page') || '1');
@@ -27,67 +24,96 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || '';
     const warehouseId = searchParams.get('warehouse_id') || '';
+    
     const offset = (page - 1) * limit;
-
-    console.log('📊 Query parameters:', { page, limit, search, status, warehouseId });
-
-    // Test basic database connection
-    try {
-      const testQuery = await db.select().from(packages).limit(1);
-      console.log('✅ Database connection successful');
-    } catch (dbError) {
-      console.error('❌ Database connection failed:', dbError);
-      return NextResponse.json(
-        { error: 'Database connection failed', details: dbError instanceof Error ? dbError.message : 'Unknown DB error' },
-        { status: 500 }
-      );
-    }
 
     // Build where conditions
     let whereConditions = [];
+    
     if (search) {
       whereConditions.push(
         or(
           ilike(packages.internalId, `%${search}%`),
           ilike(packages.trackingNumberInbound, `%${search}%`),
-          ilike(packages.senderName, `%${search}%`)
+          ilike(packages.description, `%${search}%`),
+          ilike(customerProfiles.customerId, `%${search}%`),
+          ilike(users.firstName, `%${search}%`),
+          ilike(users.lastName, `%${search}%`),
+          ilike(users.email, `%${search}%`)
         )
       );
     }
+
     if (status) {
-      whereConditions.push(eq(packages.status, status as any));
+      // Ensure status is one of the valid enum values
+      const validStatuses = [
+        'expected', 'received', 'processing', 'ready_to_ship', 
+        'shipped', 'delivered', 'returned', 'disposed', 'missing', 'damaged', 'held'
+      ];
+      
+      if (validStatuses.includes(status)) {
+        whereConditions.push(eq(packages.status, status as any));
+      }
     }
+
     if (warehouseId) {
       whereConditions.push(eq(packages.warehouseId, warehouseId));
     }
 
     // Combine conditions
-    const whereClause = whereConditions.length > 0 ?
-      whereConditions.reduce((acc, condition) => sql`${acc} AND ${condition}`) : undefined;
+    const whereClause = whereConditions.length > 0 
+      ? and(...whereConditions)
+      : undefined;
 
-    // Get packages with related data
+    // Get packages with related data - Use users table for firstName/lastName
     const packagesQuery = db
       .select({
+        // Package fields
         id: packages.id,
         internalId: packages.internalId,
+        suiteCodeCaptured: packages.suiteCodeCaptured,
         trackingNumberInbound: packages.trackingNumberInbound,
         senderName: packages.senderName,
+        senderCompany: packages.senderCompany,
+        senderTrackingUrl: packages.senderTrackingUrl,
         description: packages.description,
-        status: packages.status,
-        weightActualKg: packages.weightActualKg,
         estimatedValue: packages.estimatedValue,
         estimatedValueCurrency: packages.estimatedValueCurrency,
+        weightActualKg: packages.weightActualKg,
+        lengthCm: packages.lengthCm,
+        widthCm: packages.widthCm,
+        heightCm: packages.heightCm,
+        volumetricWeightKg: packages.volumetricWeightKg,
+        status: packages.status,
+        expectedArrivalDate: packages.expectedArrivalDate,
         receivedAt: packages.receivedAt,
+        readyToShipAt: packages.readyToShipAt,
+        storageExpiresAt: packages.storageExpiresAt,
+        warehouseNotes: packages.warehouseNotes,
+        customerNotes: packages.customerNotes,
+        specialInstructions: packages.specialInstructions,
+        isFragile: packages.isFragile,
+        isHighValue: packages.isHighValue,
+        requiresAdultSignature: packages.requiresAdultSignature,
+        isRestricted: packages.isRestricted,
+        processedAt: packages.processedAt,
         createdAt: packages.createdAt,
+        updatedAt: packages.updatedAt,
+        
+        // Customer info - Fixed: use users table for firstName/lastName
         customerName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
         customerEmail: users.email,
         customerId: customerProfiles.customerId,
+        
+        // Warehouse info
         warehouseName: warehouses.name,
         warehouseCode: warehouses.code,
+        warehouseCity: warehouses.city,
+        warehouseCountry: warehouses.countryCode,
       })
       .from(packages)
       .innerJoin(customerProfiles, eq(packages.customerProfileId, customerProfiles.id))
-      .innerJoin(users, eq(customerProfiles.userId, users.id))
+      .innerJoin(users, eq(customerProfiles.userId, users.id)) // Join to users table
       .innerJoin(warehouses, eq(packages.warehouseId, warehouses.id))
       .orderBy(desc(packages.createdAt))
       .limit(limit)
@@ -98,15 +124,15 @@ export async function GET(request: NextRequest) {
     }
 
     const packagesList = await packagesQuery;
-    console.log('✅ Packages query successful, found:', packagesList.length, 'packages');
 
     // Get total count for pagination
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)` })
       .from(packages)
+      .innerJoin(customerProfiles, eq(packages.customerProfileId, customerProfiles.id))
+      .innerJoin(users, eq(customerProfiles.userId, users.id))
+      .innerJoin(warehouses, eq(packages.warehouseId, warehouses.id))
       .where(whereClause);
-
-    console.log('✅ Count query successful, total:', count);
 
     return NextResponse.json({
       packages: packagesList,
@@ -117,19 +143,11 @@ export async function GET(request: NextRequest) {
         pages: Math.ceil(count / limit),
       },
     });
+
   } catch (error) {
-    console.error('❌ Unexpected error in admin packages API:', error);
-    
-    // Return detailed error information in development
-    const isDevelopment = process.env.NODE_ENV === 'development';
+    console.error('Error fetching packages:', error);
     return NextResponse.json(
-      {
-        error: 'Failed to fetch packages',
-        ...(isDevelopment && {
-          details: error instanceof Error ? error.message : 'Unknown error',
-          stack: error instanceof Error ? error.stack : undefined
-        })
-      },
+      { error: 'Failed to fetch packages' },
       { status: 500 }
     );
   }
@@ -137,115 +155,138 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check permission
-    const adminUser = await requirePermission('packages.create');
-
-    const body = await request.json();
+    // Check permission  
+    const adminUser = await requirePermission('packages.manage');
     
-    // Validate required fields
-    const requiredFields = ['customerProfileId', 'warehouseId', 'internalId', 'senderName', 'description', 'weightActualKg'];
-    for (const field of requiredFields) {
-      if (!body[field]) {
-        return NextResponse.json(
-          { error: `Missing required field: ${field}` },
-          { status: 400 }
-        );
-      }
+    const body = await request.json();
+    const {
+      incomingShipmentItemId,
+      description,
+      weightActualKg,
+      lengthCm,
+      widthCm,
+      heightCm,
+      estimatedValue,
+      estimatedValueCurrency,
+      warehouseNotes,
+      specialInstructions,
+      isFragile,
+      isHighValue,
+      requiresAdultSignature,
+      isRestricted,
+    } = body;
+
+    // Get the assigned incoming shipment item
+    const assignedItem = await db
+      .select()
+      .from(incomingShipmentItems)
+      .where(eq(incomingShipmentItems.id, incomingShipmentItemId))
+      .limit(1);
+
+    if (!assignedItem.length) {
+      return NextResponse.json(
+        { error: 'Incoming shipment item not found' },
+        { status: 404 }
+      );
     }
 
-    // Check if internal ID already exists
+    const item = assignedItem[0];
+
+    if (!item.assignedCustomerProfileId) {
+      return NextResponse.json(
+        { error: 'Incoming shipment item is not assigned to a customer' },
+        { status: 400 }
+      );
+    }
+
+    // Check if package already exists for this incoming item
     const existingPackage = await db
-      .select({ id: packages.id })
+      .select()
       .from(packages)
-      .where(eq(packages.internalId, body.internalId))
+      .where(eq(packages.incomingShipmentItemId, incomingShipmentItemId))
       .limit(1);
 
-    if (existingPackage.length > 0) {
+    if (existingPackage.length) {
       return NextResponse.json(
-        { error: 'Package with this internal ID already exists' },
-        { status: 400 }
+        { error: 'Package already exists for this incoming shipment item' },
+        { status: 409 }
       );
     }
 
-    // Verify customer and warehouse exist
-    const [customer] = await db
-      .select({ id: customerProfiles.id, tenantId: customerProfiles.tenantId })
-      .from(customerProfiles)
-      .where(eq(customerProfiles.id, body.customerProfileId))
-      .limit(1);
+    // Generate internal package ID
+    const internalId = `PKG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    if (!customer) {
-      return NextResponse.json(
-        { error: 'Customer not found' },
-        { status: 400 }
-      );
+    // Calculate volumetric weight if dimensions provided - Convert to string for decimal field
+    let volumetricWeightKg: string | null = null;
+    if (lengthCm && widthCm && heightCm) {
+      const volumetricWeight = (lengthCm * widthCm * heightCm) / 5000;
+      volumetricWeightKg = volumetricWeight.toFixed(3); // Convert to string with 3 decimal places
     }
 
-    const [warehouse] = await db
-      .select({ id: warehouses.id, acceptsNewPackages: warehouses.acceptsNewPackages })
-      .from(warehouses)
-      .where(eq(warehouses.id, body.warehouseId))
-      .limit(1);
-
-    if (!warehouse) {
-      return NextResponse.json(
-        { error: 'Warehouse not found' },
-        { status: 400 }
-      );
-    }
-
-    if (!warehouse.acceptsNewPackages) {
-      return NextResponse.json(
-        { error: 'Warehouse is not accepting new packages' },
-        { status: 400 }
-      );
-    }
-
-    // Create package
+    // Create the package - All numeric values converted to strings for decimal fields
     const [newPackage] = await db
       .insert(packages)
       .values({
-        tenantId: customer.tenantId,
-        customerProfileId: body.customerProfileId,
-        warehouseId: body.warehouseId,
-        internalId: body.internalId,
-        suiteCodeCaptured: body.suiteCodeCaptured || null,
-        trackingNumberInbound: body.trackingNumberInbound || null,
-        senderName: body.senderName,
-        senderCompany: body.senderCompany || null,
-        senderTrackingUrl: body.senderTrackingUrl || null,
-        description: body.description,
-        estimatedValue: body.estimatedValue || '0',
-        estimatedValueCurrency: body.estimatedValueCurrency || 'USD',
-        weightActualKg: body.weightActualKg,
-        lengthCm: body.lengthCm || null,
-        widthCm: body.widthCm || null,
-        heightCm: body.heightCm || null,
-        volumetricWeightKg: body.volumetricWeightKg || null,
-        status: body.status || 'received',
-        expectedArrivalDate: body.expectedArrivalDate || null,
-        receivedAt: body.receivedAt ? new Date(body.receivedAt) : new Date(),
-        warehouseNotes: body.warehouseNotes || null,
-        specialInstructions: body.specialInstructions || null,
-        isFragile: body.isFragile || false,
-        isHighValue: body.isHighValue || false,
-        requiresAdultSignature: body.requiresAdultSignature || false,
-        isRestricted: body.isRestricted || false,
+        tenantId: adminUser.tenantId,
+        customerProfileId: item.assignedCustomerProfileId,
+        warehouseId: item.warehouseId,
+        incomingShipmentItemId: incomingShipmentItemId,
+        internalId,
+        
+        // Copy tracking info from incoming item
+        trackingNumberInbound: item.trackingNumber,
+        senderTrackingUrl: item.courierTrackingUrl,
+        senderName: item.courierName, // Use courier name as sender initially
+        
+        // Package details
+        description: description || 'Package received via incoming shipment',
+        weightActualKg: weightActualKg ? weightActualKg.toString() : null,
+        lengthCm: lengthCm ? lengthCm.toString() : null,
+        widthCm: widthCm ? widthCm.toString() : null,
+        heightCm: heightCm ? heightCm.toString() : null,
+        volumetricWeightKg,
+        estimatedValue: estimatedValue ? estimatedValue.toString() : '0',
+        estimatedValueCurrency: estimatedValueCurrency || 'USD',
+        
+        // Processing details
+        status: 'received', // Start with received status since it came from incoming
+        receivedAt: sql`now()`,
+        warehouseNotes,
+        specialInstructions,
+        isFragile: isFragile || false,
+        isHighValue: isHighValue || false,
+        requiresAdultSignature: requiresAdultSignature || false,
+        isRestricted: isRestricted || false,
         processedBy: adminUser.id,
-        processedAt: new Date(),
+        processedAt: sql`now()`,
       })
       .returning();
 
-    // Create initial status history entry
-    await db.insert(packageStatusHistory).values({
-      packageId: newPackage.id,
-      status: newPackage.status as any, // Type assertion to handle the enum type
-      notes: 'Package registered and received at warehouse',
-      changedBy: adminUser.id,
-      changeReason: 'initial_registration',
-    });
+    // Create status history entry
+    await db
+      .insert(packageStatusHistory)
+      .values({
+        packageId: newPackage.id,
+        status: 'received',
+        notes: 'Package created from assigned incoming shipment item',
+        changedBy: adminUser.id,
+        changeReason: 'package_creation',
+      });
 
-    return NextResponse.json(newPackage, { status: 201 });
+    // Update the incoming shipment item status to 'received'
+    await db
+      .update(incomingShipmentItems)
+      .set({
+        assignmentStatus: 'received',
+        updatedAt: sql`now()`,
+      })
+      .where(eq(incomingShipmentItems.id, incomingShipmentItemId));
+
+    return NextResponse.json({
+      message: 'Package created successfully',
+      package: newPackage,
+    }, { status: 201 });
+
   } catch (error) {
     console.error('Error creating package:', error);
     return NextResponse.json(

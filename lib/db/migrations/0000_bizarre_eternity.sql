@@ -1,7 +1,9 @@
 CREATE TYPE "public"."address_type" AS ENUM('shipping', 'billing');--> statement-breakpoint
 CREATE TYPE "public"."assignment_status" AS ENUM('active', 'suspended', 'expired');--> statement-breakpoint
 CREATE TYPE "public"."company_type" AS ENUM('LLC', 'Corp', 'Ltd', 'Partnership', 'Sole_Proprietorship', 'Other');--> statement-breakpoint
+CREATE TYPE "public"."incoming_shipment_status" AS ENUM('pending', 'scanning', 'scanned', 'assigned', 'received');--> statement-breakpoint
 CREATE TYPE "public"."invoice_type" AS ENUM('shipping', 'storage', 'handling', 'personal_shopper', 'customs_duty', 'insurance', 'other');--> statement-breakpoint
+CREATE TYPE "public"."item_assignment_status" AS ENUM('unassigned', 'assigned', 'received');--> statement-breakpoint
 CREATE TYPE "public"."kyc_status" AS ENUM('not_required', 'pending', 'approved', 'rejected');--> statement-breakpoint
 CREATE TYPE "public"."notification_status" AS ENUM('pending', 'sent', 'delivered', 'failed', 'bounced');--> statement-breakpoint
 CREATE TYPE "public"."package_status" AS ENUM('expected', 'received', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'returned', 'disposed', 'missing', 'damaged', 'held');--> statement-breakpoint
@@ -76,6 +78,43 @@ CREATE TABLE "companies" (
 	"use_for_customs" boolean DEFAULT false,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "countries" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"code" varchar(2) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"region" varchar(100),
+	"calling_code" varchar(10),
+	"is_active" boolean DEFAULT true,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "countries_code_unique" UNIQUE("code")
+);
+--> statement-breakpoint
+CREATE TABLE "couriers" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"code" varchar(50) NOT NULL,
+	"website_url" varchar(500),
+	"tracking_url_template" varchar(500),
+	"supported_countries" jsonb DEFAULT '[]'::jsonb,
+	"is_active" boolean DEFAULT true,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "couriers_code_unique" UNIQUE("code")
+);
+--> statement-breakpoint
+CREATE TABLE "currencies" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"code" varchar(3) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"symbol" varchar(10),
+	"decimal_places" integer DEFAULT 2,
+	"is_active" boolean DEFAULT true,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "currencies_code_unique" UNIQUE("code")
 );
 --> statement-breakpoint
 CREATE TABLE "customer_profiles" (
@@ -160,6 +199,59 @@ CREATE TABLE "financial_invoices" (
 	CONSTRAINT "financial_invoices_invoice_number_unique" UNIQUE("invoice_number")
 );
 --> statement-breakpoint
+CREATE TABLE "incoming_shipment_items" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tenant_id" uuid NOT NULL,
+	"warehouse_id" uuid NOT NULL,
+	"incoming_shipment_id" uuid NOT NULL,
+	"tracking_number" varchar(255),
+	"courier_name" varchar(255),
+	"courier_tracking_url" varchar(500),
+	"scanned_by" uuid,
+	"scanned_at" timestamp,
+	"assigned_customer_profile_id" uuid,
+	"assigned_by" uuid,
+	"assigned_at" timestamp,
+	"assignment_status" varchar(50) DEFAULT 'pending',
+	"weight_kg" numeric(8, 3),
+	"length_cm" numeric(8, 2),
+	"width_cm" numeric(8, 2),
+	"height_cm" numeric(8, 2),
+	"description" text,
+	"estimated_value" numeric(12, 2),
+	"estimated_value_currency" varchar(3) DEFAULT 'USD',
+	"notes" text,
+	"special_instructions" text,
+	"is_fragile" boolean DEFAULT false,
+	"is_high_value" boolean DEFAULT false,
+	"requires_inspection" boolean DEFAULT false,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "incoming_shipments" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tenant_id" uuid NOT NULL,
+	"warehouse_id" uuid NOT NULL,
+	"shipment_number" varchar(100) NOT NULL,
+	"batch_reference" varchar(100) NOT NULL,
+	"courier_id" uuid,
+	"courier_name" varchar(255),
+	"tracking_number" varchar(255),
+	"arrival_date" date,
+	"expected_arrival_date" date,
+	"actual_arrival_date" date,
+	"status" varchar(50) DEFAULT 'pending',
+	"received_by" uuid,
+	"received_at" timestamp,
+	"processed_by" uuid,
+	"processed_at" timestamp,
+	"notes" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "incoming_shipments_shipment_number_unique" UNIQUE("shipment_number")
+);
+--> statement-breakpoint
 CREATE TABLE "notification_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"tenant_id" uuid NOT NULL,
@@ -204,14 +296,11 @@ CREATE TABLE "package_documents" (
 	"package_id" uuid NOT NULL,
 	"document_type" varchar(50) NOT NULL,
 	"file_name" varchar(255) NOT NULL,
-	"file_url" varchar(500) NOT NULL,
-	"file_size_bytes" integer,
+	"file_size" integer,
 	"mime_type" varchar(100),
-	"is_public" boolean DEFAULT true,
-	"display_order" integer DEFAULT 0,
+	"file_url" varchar(500),
 	"uploaded_by" uuid,
-	"upload_notes" text,
-	"created_at" timestamp DEFAULT now() NOT NULL
+	"uploaded_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "package_status_history" (
@@ -229,6 +318,7 @@ CREATE TABLE "packages" (
 	"tenant_id" uuid NOT NULL,
 	"customer_profile_id" uuid NOT NULL,
 	"warehouse_id" uuid NOT NULL,
+	"incoming_shipment_item_id" uuid,
 	"internal_id" varchar(50) NOT NULL,
 	"suite_code_captured" varchar(50),
 	"tracking_number_inbound" varchar(255),
@@ -236,7 +326,7 @@ CREATE TABLE "packages" (
 	"sender_company" varchar(255),
 	"sender_tracking_url" varchar(500),
 	"description" text,
-	"estimated_value" numeric(12, 2),
+	"estimated_value" numeric(12, 2) DEFAULT '0',
 	"estimated_value_currency" varchar(3) DEFAULT 'USD',
 	"weight_actual_kg" numeric(8, 3),
 	"length_cm" numeric(8, 2),
@@ -368,6 +458,26 @@ CREATE TABLE "system_configs" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "tenant_couriers" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tenant_id" uuid NOT NULL,
+	"courier_id" uuid NOT NULL,
+	"is_active" boolean DEFAULT true,
+	"contract_details" jsonb,
+	"api_credentials" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "tenant_currencies" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tenant_id" uuid NOT NULL,
+	"currency_id" uuid NOT NULL,
+	"is_default" boolean DEFAULT false,
+	"exchange_rate" numeric(12, 6) DEFAULT '1.0',
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "tenants" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" varchar(255) NOT NULL,
@@ -467,6 +577,17 @@ ALTER TABLE "financial_invoice_lines" ADD CONSTRAINT "financial_invoice_lines_in
 ALTER TABLE "financial_invoices" ADD CONSTRAINT "financial_invoices_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "financial_invoices" ADD CONSTRAINT "financial_invoices_customer_profile_id_customer_profiles_id_fk" FOREIGN KEY ("customer_profile_id") REFERENCES "public"."customer_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "financial_invoices" ADD CONSTRAINT "financial_invoices_shipment_id_shipments_id_fk" FOREIGN KEY ("shipment_id") REFERENCES "public"."shipments"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "incoming_shipment_items" ADD CONSTRAINT "incoming_shipment_items_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "incoming_shipment_items" ADD CONSTRAINT "incoming_shipment_items_warehouse_id_warehouses_id_fk" FOREIGN KEY ("warehouse_id") REFERENCES "public"."warehouses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "incoming_shipment_items" ADD CONSTRAINT "incoming_shipment_items_incoming_shipment_id_incoming_shipments_id_fk" FOREIGN KEY ("incoming_shipment_id") REFERENCES "public"."incoming_shipments"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "incoming_shipment_items" ADD CONSTRAINT "incoming_shipment_items_scanned_by_users_id_fk" FOREIGN KEY ("scanned_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "incoming_shipment_items" ADD CONSTRAINT "incoming_shipment_items_assigned_customer_profile_id_customer_profiles_id_fk" FOREIGN KEY ("assigned_customer_profile_id") REFERENCES "public"."customer_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "incoming_shipment_items" ADD CONSTRAINT "incoming_shipment_items_assigned_by_users_id_fk" FOREIGN KEY ("assigned_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "incoming_shipments" ADD CONSTRAINT "incoming_shipments_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "incoming_shipments" ADD CONSTRAINT "incoming_shipments_warehouse_id_warehouses_id_fk" FOREIGN KEY ("warehouse_id") REFERENCES "public"."warehouses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "incoming_shipments" ADD CONSTRAINT "incoming_shipments_courier_id_couriers_id_fk" FOREIGN KEY ("courier_id") REFERENCES "public"."couriers"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "incoming_shipments" ADD CONSTRAINT "incoming_shipments_received_by_users_id_fk" FOREIGN KEY ("received_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "incoming_shipments" ADD CONSTRAINT "incoming_shipments_processed_by_users_id_fk" FOREIGN KEY ("processed_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notification_logs" ADD CONSTRAINT "notification_logs_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notification_logs" ADD CONSTRAINT "notification_logs_customer_profile_id_customer_profiles_id_fk" FOREIGN KEY ("customer_profile_id") REFERENCES "public"."customer_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notification_preferences" ADD CONSTRAINT "notification_preferences_customer_profile_id_customer_profiles_id_fk" FOREIGN KEY ("customer_profile_id") REFERENCES "public"."customer_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -477,6 +598,7 @@ ALTER TABLE "package_status_history" ADD CONSTRAINT "package_status_history_chan
 ALTER TABLE "packages" ADD CONSTRAINT "packages_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "packages" ADD CONSTRAINT "packages_customer_profile_id_customer_profiles_id_fk" FOREIGN KEY ("customer_profile_id") REFERENCES "public"."customer_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "packages" ADD CONSTRAINT "packages_warehouse_id_warehouses_id_fk" FOREIGN KEY ("warehouse_id") REFERENCES "public"."warehouses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "packages" ADD CONSTRAINT "packages_incoming_shipment_item_id_incoming_shipment_items_id_fk" FOREIGN KEY ("incoming_shipment_item_id") REFERENCES "public"."incoming_shipment_items"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "packages" ADD CONSTRAINT "packages_processed_by_users_id_fk" FOREIGN KEY ("processed_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_permission_id_permissions_id_fk" FOREIGN KEY ("permission_id") REFERENCES "public"."permissions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -493,6 +615,10 @@ ALTER TABLE "shipments" ADD CONSTRAINT "shipments_company_id_companies_id_fk" FO
 ALTER TABLE "shipments" ADD CONSTRAINT "shipments_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "shipments" ADD CONSTRAINT "shipments_processed_by_users_id_fk" FOREIGN KEY ("processed_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "system_configs" ADD CONSTRAINT "system_configs_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tenant_couriers" ADD CONSTRAINT "tenant_couriers_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tenant_couriers" ADD CONSTRAINT "tenant_couriers_courier_id_couriers_id_fk" FOREIGN KEY ("courier_id") REFERENCES "public"."couriers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tenant_currencies" ADD CONSTRAINT "tenant_currencies_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tenant_currencies" ADD CONSTRAINT "tenant_currencies_currency_id_currencies_id_fk" FOREIGN KEY ("currency_id") REFERENCES "public"."currencies"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_assigned_by_users_id_fk" FOREIGN KEY ("assigned_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
