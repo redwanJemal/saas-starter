@@ -18,6 +18,7 @@ import {
 import { hashPassword } from '@/lib/auth/session';
 import { seedMasterData } from './seed-master-data';
 import { seedShippingZones } from './seed-shipping-zones';
+import { seedStorageConfiguration } from './seed-storage-config';
 
 async function seed() {
   console.log('🌱 Starting database seed...');
@@ -187,6 +188,9 @@ async function seed() {
 
   await db.insert(systemConfigs).values(configData);
   console.log('✅ System configurations created');
+
+  
+  await seedStorageConfiguration();
 
   // 8. Create admin user
   const adminPasswordHash = await hashPassword('admin123');

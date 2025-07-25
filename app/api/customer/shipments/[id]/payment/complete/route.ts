@@ -141,7 +141,6 @@ export async function POST(
       );
 
     // Generate invoice number
-    // const invoiceNumber = await generateInvoiceNumber(shipment.tenantId);
     const invoiceNumber = await generateInvoiceNumber();
 
     // Create financial invoice
@@ -152,20 +151,16 @@ export async function POST(
         customerProfileId: shipment.customerProfileId,
         invoiceNumber,
         invoiceType: 'shipping',
-        totalAmount: shipment.totalCost,
-        currency: shipment.costCurrency || 'USD',
-        status: 'paid',
+        subtotal: shipment.totalCost || '0.00',
+        totalAmount: shipment.totalCost || '0.00',
+        currencyCode: shipment.costCurrency || 'USD',
+        paymentStatus: 'paid',
         issuedAt: now,
         paidAt: now,
         paymentMethod: 'stripe',
         paymentReference: paymentIntentId,
         shipmentId: shipment.id,
-        metadata: {
-          stripePaymentIntentId: paymentIntentId,
-          shipmentNumber: shipment.shipmentNumber,
-          paymentCompletedAt: now.toISOString(),
-          storageFeesIncluded: parseFloat(shipment.storageFee || '0') > 0
-        }
+        notes: `Payment completed via Stripe on ${now.toLocaleDateString()}`
       })
       .returning();
 
@@ -174,37 +169,43 @@ export async function POST(
 
     // Shipping cost line item
     if (parseFloat(shipment.shippingCost || '0') > 0) {
+      const unitPrice = shipment.shippingCost || '0.00';
       lineItems.push({
         invoiceId: newInvoice.id,
         description: 'Shipping Cost',
-        quantity: 1,
-        unitPrice: shipment.shippingCost,
-        totalPrice: shipment.shippingCost,
-        category: 'shipping'
+        quantity: '1.000',
+        unitPrice: unitPrice,
+        lineTotal: unitPrice,
+        referenceType: 'shipment',
+        referenceId: shipment.id
       });
     }
 
     // Insurance cost line item
     if (parseFloat(shipment.insuranceCost || '0') > 0) {
+      const unitPrice = shipment.insuranceCost || '0.00';
       lineItems.push({
         invoiceId: newInvoice.id,
         description: 'Insurance',
-        quantity: 1,
-        unitPrice: shipment.insuranceCost,
-        totalPrice: shipment.insuranceCost,
-        category: 'insurance'
+        quantity: '1.000',
+        unitPrice: unitPrice,
+        lineTotal: unitPrice,
+        referenceType: 'shipment',
+        referenceId: shipment.id
       });
     }
 
     // Handling fee line item
     if (parseFloat(shipment.handlingFee || '0') > 0) {
+      const unitPrice = shipment.handlingFee || '0.00';
       lineItems.push({
         invoiceId: newInvoice.id,
         description: 'Handling Fee',
-        quantity: 1,
-        unitPrice: shipment.handlingFee,
-        totalPrice: shipment.handlingFee,
-        category: 'handling'
+        quantity: '1.000',
+        unitPrice: unitPrice,
+        lineTotal: unitPrice,
+        referenceType: 'shipment',
+        referenceId: shipment.id
       });
     }
 
@@ -217,19 +218,17 @@ export async function POST(
         .where(eq(shipmentPackages.shipmentId, shipmentId));
       
       const packageCount = packageCountQuery[0]?.count || 1;
+      const unitPrice = (parseFloat(shipment.storageFee || '0') / packageCount).toFixed(2);
+      const totalPrice = shipment.storageFee || '0.00';
       
       lineItems.push({
         invoiceId: newInvoice.id,
         description: `Storage Fee (${packageCount} package${packageCount > 1 ? 's' : ''})`,
-        quantity: packageCount,
-        unitPrice: (parseFloat(shipment.storageFee || '0') / packageCount).toFixed(2),
-        totalPrice: shipment.storageFee,
-        category: 'storage',
-        metadata: {
-          storageCalculatedAt: now.toISOString(),
-          averageStorageDays: 'calculated_at_payment',
-          includesBinLocationFees: true
-        }
+        quantity: packageCount.toString(),
+        unitPrice: unitPrice,
+        lineTotal: totalPrice,
+        referenceType: 'storage',
+        referenceId: shipment.id
       });
     }
 

@@ -22,6 +22,13 @@
       "when": 1753427974316,
       "tag": "0002_common_earthquake",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1753451295434,
+      "tag": "0003_white_hellcat",
+      "breakpoints": true
     }
   ]
 }
