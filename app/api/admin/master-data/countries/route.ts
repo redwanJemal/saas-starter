@@ -7,9 +7,6 @@ import { requirePermission } from '@/lib/auth/admin';
 
 export async function GET(request: NextRequest) {
   try {
-    // Check permission
-    await requirePermission('admin.manage');
-
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get('search') || '';
     const page = parseInt(searchParams.get('page') || '1');

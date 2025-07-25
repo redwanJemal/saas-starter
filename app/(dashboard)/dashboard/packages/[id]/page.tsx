@@ -1,220 +1,135 @@
-// app/(dashboard)/dashboard/packages/[id]/page.tsx
+// app/admin/packages/[id]/page.tsx
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { 
-  Package, 
   ArrowLeft, 
-  Calendar, 
+  Package as PackageIcon, 
+  User, 
   MapPin, 
   Truck, 
-  Weight, 
-  Ruler, 
-  DollarSign, 
-  FileText, 
-  ExternalLink,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  Eye,
-  Download,
-  MessageCircle,
-  Shield,
-  AlertCircle
+  Calendar,
+  Weight,
+  Ruler,
+  FileText,
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
-import Link from 'next/link';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils';
 
-interface PackageDetail {
-  id: string;
-  internalId: string;
-  trackingNumberInbound: string;
-  status: string;
-  senderName: string;
-  description: string;
-  weightActualKg: number;
-  lengthCm: number;
-  widthCm: number;
-  heightCm: number;
-  volumetricWeightKg: number;
-  estimatedValue: number;
-  estimatedValueCurrency: string;
-  expectedArrivalDate: string;
-  receivedAt: string;
-  readyToShipAt: string;
-  storageExpiresAt: string;
-  warehouseNotes: string;
-  customerNotes: string;
-  specialInstructions: string;
-  isFragile: boolean;
-  isHighValue: boolean;
-  requiresAdultSignature: boolean;
-  isRestricted: boolean;
-  warehouseName: string;
-  warehouseAddress: string;
-  courierTrackingUrl: string;
-  batchReference: string;
-  courierName: string;
-  createdAt: string;
-  updatedAt: string;
+interface PackageDetails {
+  package: {
+    id: string;
+    trackingInbound: string;
+    senderName: string;
+    weightActualKg: number;
+    dimLCm: number;
+    dimWCm: number;
+    dimHCm: number;
+    status: string;
+    receivedAt: string;
+    notes: string;
+    createdAt: string;
+    updatedAt: string;
+    suiteCodeCaptured: string;
+    
+    // Warehouse details
+    warehouseId: string;
+    warehouseName: string;
+    warehouseCode: string;
+    warehouseCountryCode: string;
+    
+    // Account details
+    accountId: string;
+    customerId: string;
+    accountFirstName: string;
+    accountLastName: string;
+    accountEmail: string;
+    accountPhone: string;
+  };
+  shipments: Array<{
+    id: string;
+    status: string;
+    carrierCode: string;
+    carrierService: string;
+    trackingOutbound: string;
+    declaredValue: number;
+    declaredCurrency: string;
+    createdAt: string;
+  }>;
+  documents: Array<{
+    id: string;
+    fileName: string;
+    fileType: string;
+    storageUrl: string;
+    createdAt: string;
+  }>;
 }
 
-interface StatusHistoryItem {
-  id: string;
-  status: string;
-  notes: string;
-  changeReason: string;
-  createdAt: string;
-  changedByName: string;
-}
+const statusColors = {
+  'pending': 'bg-yellow-100 text-yellow-800',
+  'received': 'bg-blue-100 text-blue-800',
+  'ready_to_ship': 'bg-green-100 text-green-800',
+  'shipped': 'bg-purple-100 text-purple-800',
+  'missing': 'bg-red-100 text-red-800',
+  'returned': 'bg-gray-100 text-gray-800',
+  'disposed': 'bg-red-100 text-red-800',
+};
 
 export default function PackageDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const packageId = params.id as string;
-  
-  const [packageDetail, setPackageDetail] = useState<PackageDetail | null>(null);
-  const [statusHistory, setStatusHistory] = useState<StatusHistoryItem[]>([]);
+  const [packageData, setPackageData] = useState<PackageDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const packageId = params.id as string;
+
   useEffect(() => {
-    if (packageId) {
-      fetchPackageDetail();
-      fetchStatusHistory();
-    }
+    fetchPackageDetails();
   }, [packageId]);
 
-  const fetchPackageDetail = async () => {
+  const fetchPackageDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/customer/packages/${packageId}`);
+      const response = await fetch(`/api/admin/packages/${packageId}`);
       
       if (!response.ok) {
-        if (response.status === 404) {
-          setError('Package not found');
-        } else if (response.status === 401) {
-          setError('Unauthorized access');
-        } else {
-          setError('Failed to load package details');
-        }
-        return;
+        throw new Error('Failed to fetch package details');
       }
-
+      
       const data = await response.json();
-      setPackageDetail(data.package);
-    } catch (error) {
-      console.error('Error fetching package detail:', error);
-      setError('Failed to load package details');
+      setPackageData(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchStatusHistory = async () => {
-    try {
-      const response = await fetch(`/api/customer/packages/${packageId}/status-history`);
-      if (response.ok) {
-        const data = await response.json();
-        setStatusHistory(data.history || []);
-      }
-    } catch (error) {
-      console.error('Error fetching status history:', error);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'expected':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'received':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'ready_to_ship':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'shipped':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'delivered':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'expected':
-        return <Clock className="h-4 w-4" />;
-      case 'received':
-        return <Package className="h-4 w-4" />;
-      case 'ready_to_ship':
-        return <CheckCircle className="h-4 w-4" />;
-      case 'shipped':
-        return <Truck className="h-4 w-4" />;
-      case 'delivered':
-        return <CheckCircle className="h-4 w-4" />;
-      default:
-        return <AlertCircle className="h-4 w-4" />;
-    }
-  };
-
-  const formatWeight = (weightKg: number) => {
-    if (!weightKg) return 'N/A';
-    return `${weightKg} kg`;
-  };
-
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
-    if (!amount) return 'N/A';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency
-    }).format(amount);
-  };
-
-  const formatDimensions = (length: number, width: number, height: number) => {
-    if (!length || !width || !height) return 'N/A';
-    return `${length} × ${width} × ${height} cm`;
-  };
-
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-6">
-        <div className="animate-pulse space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-8 bg-gray-200 rounded"></div>
-            <div className="h-8 bg-gray-200 rounded w-48"></div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="h-64 bg-gray-200 rounded-lg"></div>
-              <div className="h-48 bg-gray-200 rounded-lg"></div>
-            </div>
-            <div className="space-y-6">
-              <div className="h-32 bg-gray-200 rounded-lg"></div>
-              <div className="h-48 bg-gray-200 rounded-lg"></div>
-            </div>
-          </div>
+      <div className="container mx-auto py-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       </div>
     );
   }
 
-  if (error || !packageDetail) {
+  if (error || !packageData) {
     return (
-      <div className="container mx-auto px-4 py-6">
-        <div className="text-center py-12">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            {error || 'Package not found'}
-          </h2>
-          <p className="text-gray-600 mb-4">
-            The package you're looking for doesn't exist or you don't have access to it.
-          </p>
-          <Button onClick={() => router.push('/dashboard/packages')}>
+      <div className="container mx-auto py-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Package Not Found</h2>
+          <p className="text-gray-600 mb-4">{error || 'The requested package could not be found.'}</p>
+          <Button onClick={() => router.push('/admin/packages')}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Packages
           </Button>
@@ -223,354 +138,219 @@ export default function PackageDetailPage() {
     );
   }
 
+  const { package: pkg, shipments, documents } = packageData;
+
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => router.push('/dashboard/packages')}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Package className="h-6 w-6 text-blue-600" />
-          </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Button 
+            variant="outline" 
+            onClick={() => router.push('/admin/packages')}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Packages
+          </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{packageDetail.internalId}</h1>
-            <p className="text-gray-600">{packageDetail.trackingNumberInbound}</p>
+            <h1 className="text-3xl font-bold">Package Details</h1>
+            <p className="text-gray-600">Tracking: {pkg.trackingInbound}</p>
           </div>
         </div>
-        <Badge className={getStatusColor(packageDetail.status)}>
-          {getStatusIcon(packageDetail.status)}
-          <span className="ml-1 capitalize">{packageDetail.status.replace('_', ' ')}</span>
+        <Badge className={statusColors[pkg.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'}>
+          {pkg.status.replace('_', ' ').toUpperCase()}
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Package Overview */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Package Overview
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-3">
-                  <Truck className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Sender</p>
-                    <p className="text-sm text-gray-600">{packageDetail.senderName || 'Unknown'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <MapPin className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Warehouse</p>
-                    <p className="text-sm text-gray-600">{packageDetail.warehouseName}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Weight className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Weight</p>
-                    <p className="text-sm text-gray-600">
-                      {formatWeight(packageDetail.weightActualKg)}
-                      {packageDetail.volumetricWeightKg && (
-                        <span className="text-xs text-gray-500 ml-2">
-                          (Vol: {formatWeight(packageDetail.volumetricWeightKg)})
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Ruler className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Dimensions</p>
-                    <p className="text-sm text-gray-600">
-                      {formatDimensions(packageDetail.lengthCm, packageDetail.widthCm, packageDetail.heightCm)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <DollarSign className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Estimated Value</p>
-                    <p className="text-sm text-gray-600">
-                      {formatCurrency(packageDetail.estimatedValue, packageDetail.estimatedValueCurrency)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Calendar className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Received</p>
-                    <p className="text-sm text-gray-600">
-                      {packageDetail.receivedAt 
-                        ? format(new Date(packageDetail.receivedAt), 'MMM d, yyyy HH:mm')
-                        : 'Not yet received'
-                      }
-                    </p>
-                  </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Package Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <PackageIcon className="mr-2 h-5 w-5" />
+              Package Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500">Tracking Number</label>
+                <p className="font-mono">{pkg.trackingInbound}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Suite Code</label>
+                <p className="font-mono">{pkg.suiteCodeCaptured}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Sender</label>
+                <p>{pkg.senderName}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Received Date</label>
+                <p>{formatDate(pkg.receivedAt)}</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center">
+                <Weight className="mr-2 h-4 w-4 text-gray-500" />
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Weight</label>
+                  <p>{pkg.weightActualKg} kg</p>
                 </div>
               </div>
-
-              {packageDetail.description && (
-                <div className="border-t pt-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Description</h4>
-                  <p className="text-sm text-gray-600">{packageDetail.description}</p>
+              <div className="flex items-center">
+                <Ruler className="mr-2 h-4 w-4 text-gray-500" />
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Dimensions</label>
+                  <p>{pkg.dimLCm} × {pkg.dimWCm} × {pkg.dimHCm} cm</p>
                 </div>
-              )}
+              </div>
+            </div>
 
-              {/* Package Flags */}
-              {(packageDetail.isFragile || packageDetail.isHighValue || packageDetail.requiresAdultSignature || packageDetail.isRestricted) && (
-                <div className="border-t pt-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Special Handling</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {packageDetail.isFragile && (
-                      <Badge variant="outline" className="text-orange-600 border-orange-200">
-                        <AlertTriangle className="mr-1 h-3 w-3" />
-                        Fragile
-                      </Badge>
-                    )}
-                    {packageDetail.isHighValue && (
-                      <Badge variant="outline" className="text-purple-600 border-purple-200">
-                        <Shield className="mr-1 h-3 w-3" />
-                        High Value
-                      </Badge>
-                    )}
-                    {packageDetail.requiresAdultSignature && (
-                      <Badge variant="outline" className="text-blue-600 border-blue-200">
-                        <FileText className="mr-1 h-3 w-3" />
-                        Adult Signature Required
-                      </Badge>
-                    )}
-                    {packageDetail.isRestricted && (
-                      <Badge variant="outline" className="text-red-600 border-red-200">
-                        <AlertCircle className="mr-1 h-3 w-3" />
-                        Restricted Item
-                      </Badge>
-                    )}
-                  </div>
+            {pkg.notes && (
+              <>
+                <Separator />
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Notes</label>
+                  <p className="text-sm">{pkg.notes}</p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Tabs for Additional Info */}
-          <Tabs defaultValue="notes" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="notes">Notes & Instructions</TabsTrigger>
-              <TabsTrigger value="history">Status History</TabsTrigger>
-            </TabsList>
+        {/* Customer Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <User className="mr-2 h-5 w-5" />
+              Customer Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500">Customer ID</label>
+                <p className="font-mono">{pkg.customerId}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Name</label>
+                <p>{pkg.accountFirstName} {pkg.accountLastName}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Email</label>
+                <p>{pkg.accountEmail}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Phone</label>
+                <p>{pkg.accountPhone}</p>
+              </div>
+            </div>
 
-            <TabsContent value="notes">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageCircle className="h-5 w-5" />
-                    Notes & Instructions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {packageDetail.customerNotes && (
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-2">Customer Notes</h4>
-                      <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-                        {packageDetail.customerNotes}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {packageDetail.warehouseNotes && (
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-2">Warehouse Notes</h4>
-                      <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                        {packageDetail.warehouseNotes}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {packageDetail.specialInstructions && (
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-2">Special Instructions</h4>
-                      <p className="text-sm text-gray-600 bg-orange-50 p-3 rounded-lg">
-                        {packageDetail.specialInstructions}
-                      </p>
-                    </div>
-                  )}
+            <Separator />
 
-                  {!packageDetail.customerNotes && !packageDetail.warehouseNotes && !packageDetail.specialInstructions && (
-                    <p className="text-sm text-gray-500 italic">No notes or special instructions.</p>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+            <div className="flex items-center">
+              <MapPin className="mr-2 h-4 w-4 text-gray-500" />
+              <div>
+                <label className="text-sm font-medium text-gray-500">Warehouse</label>
+                <p>{pkg.warehouseName} ({pkg.warehouseCode})</p>
+                <p className="text-sm text-gray-600">{pkg.warehouseCountryCode}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-            <TabsContent value="history">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Status History
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {statusHistory.length > 0 ? (
-                    <div className="space-y-4">
-                      {statusHistory.map((item, index) => (
-                        <div key={item.id} className="flex gap-4">
-                          <div className="flex flex-col items-center">
-                            <div className={`p-2 rounded-full ${getStatusColor(item.status).replace('text-', 'bg-').replace('bg-', 'bg-opacity-20 ')}`}>
-                              {getStatusIcon(item.status)}
-                            </div>
-                            {index < statusHistory.length - 1 && (
-                              <div className="w-px h-8 bg-gray-200 mt-2"></div>
-                            )}
-                          </div>
-                          <div className="flex-1 pb-4">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-medium capitalize">
-                                {item.status.replace('_', ' ')}
-                              </p>
-                              <p className="text-sm text-gray-500">
-                                {format(new Date(item.createdAt), 'MMM d, yyyy HH:mm')}
-                              </p>
-                            </div>
-                            {item.notes && (
-                              <p className="text-sm text-gray-600 mb-1">{item.notes}</p>
-                            )}
-                            {item.changeReason && (
-                              <p className="text-xs text-gray-500">Reason: {item.changeReason}</p>
-                            )}
-                            {item.changedByName && (
-                              <p className="text-xs text-gray-500">By: {item.changedByName}</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">No status history available.</p>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Quick Actions */}
-          <Card>
+        {/* Shipments */}
+        {shipments.length > 0 && (
+          <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {packageDetail.courierTrackingUrl && (
-                <Button variant="outline" className="w-full" asChild>
-                  <a href={packageDetail.courierTrackingUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Track with Courier
-                  </a>
-                </Button>
-              )}
-              
-              <Button variant="outline" className="w-full">
-                <Download className="mr-2 h-4 w-4" />
-                Download Receipt
-              </Button>
-              
-              {packageDetail.status === 'ready_to_ship' && (
-                <Button className="w-full">
-                  <Truck className="mr-2 h-4 w-4" />
-                  Create Shipment
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Important Dates */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Important Dates
+              <CardTitle className="flex items-center">
+                <Truck className="mr-2 h-5 w-5" />
+                Shipments
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {packageDetail.expectedArrivalDate && (
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Expected Arrival</p>
-                  <p className="text-sm text-gray-600">
-                    {format(new Date(packageDetail.expectedArrivalDate), 'MMM d, yyyy')}
-                  </p>
-                </div>
-              )}
-              
-              {packageDetail.receivedAt && (
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Received</p>
-                  <p className="text-sm text-gray-600">
-                    {format(new Date(packageDetail.receivedAt), 'MMM d, yyyy HH:mm')}
-                  </p>
-                </div>
-              )}
-              
-              {packageDetail.readyToShipAt && (
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Ready to Ship</p>
-                  <p className="text-sm text-gray-600">
-                    {format(new Date(packageDetail.readyToShipAt), 'MMM d, yyyy HH:mm')}
-                  </p>
-                </div>
-              )}
-              
-              {packageDetail.storageExpiresAt && (
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Storage Expires</p>
-                  <p className="text-sm text-red-600">
-                    {format(new Date(packageDetail.storageExpiresAt), 'MMM d, yyyy')}
-                  </p>
-                </div>
-              )}
+            <CardContent>
+              <div className="space-y-4">
+                {shipments.map((shipment) => (
+                  <div key={shipment.id} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium">
+                        {shipment.carrierCode} - {shipment.carrierService}
+                      </h4>
+                      <Badge>{shipment.status.replace('_', ' ').toUpperCase()}</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <label className="font-medium text-gray-500">Tracking</label>
+                        <p className="font-mono">{shipment.trackingOutbound}</p>
+                      </div>
+                      <div>
+                        <label className="font-medium text-gray-500">Declared Value</label>
+                        <p>{shipment.declaredValue} {shipment.declaredCurrency}</p>
+                      </div>
+                      <div>
+                        <label className="font-medium text-gray-500">Created</label>
+                        <p>{formatDate(shipment.createdAt)}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
+        )}
 
-          {/* Batch Info */}
-          {(packageDetail.batchReference || packageDetail.courierName) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Shipment Info
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {packageDetail.batchReference && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Batch Reference</p>
-                    <p className="text-sm text-gray-600">{packageDetail.batchReference}</p>
+        {/* Documents */}
+        {documents.length > 0 && (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <FileText className="mr-2 h-5 w-5" />
+                Documents & Photos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {documents.map((doc) => (
+                  <div key={doc.id} className="border rounded-lg p-4 text-center">
+                    <div className="mb-2">
+                      {doc.fileType.startsWith('image/') ? (
+                        <ImageIcon className="h-8 w-8 mx-auto text-blue-500" />
+                      ) : (
+                        <FileText className="h-8 w-8 mx-auto text-gray-500" />
+                      )}
+                    </div>
+                    <p className="text-sm font-medium truncate">{doc.fileName}</p>
+                    <p className="text-xs text-gray-500">{formatDate(doc.createdAt)}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      onClick={() => window.open(doc.storageUrl, '_blank')}
+                    >
+                      View
+                    </Button>
                   </div>
-                )}
-                
-                {packageDetail.courierName && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Courier</p>
-                    <p className="text-sm text-gray-600">{packageDetail.courierName}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex justify-end space-x-4">
+        {pkg.status === 'ready_to_ship' && (
+          <Button>
+            Create Shipment
+          </Button>
+        )}
+        <Button variant="outline">
+          Edit Package
+        </Button>
       </div>
     </div>
   );

@@ -95,17 +95,14 @@ export async function GET(
         documentType: packageDocuments.documentType,
         fileName: packageDocuments.fileName,
         fileUrl: packageDocuments.fileUrl,
-        fileSizeBytes: packageDocuments.fileSizeBytes,
+        fileSizeBytes: packageDocuments.fileSize,
         mimeType: packageDocuments.mimeType,
-        isPublic: packageDocuments.isPublic,
-        uploadNotes: packageDocuments.uploadNotes,
-        createdAt: packageDocuments.createdAt,
         uploadedByName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
       })
       .from(packageDocuments)
       .leftJoin(users, eq(packageDocuments.uploadedBy, users.id))
       .where(eq(packageDocuments.packageId, packageId))
-      .orderBy(desc(packageDocuments.createdAt));
+      .orderBy(desc(packageDocuments.uploadedAt));
 
     return NextResponse.json({
       package: packageDetails,
