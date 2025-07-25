@@ -46,6 +46,9 @@ export * from './audit';
 // System configuration
 export * from './config';
 
+// Storage management
+export * from './storage';
+
 // Global reference tables
 export * from './reference';
 

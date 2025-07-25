@@ -379,10 +379,19 @@ export async function POST(request: NextRequest) {
       })
       .where(inArray(packages.id, packageIds));
 
-    return NextResponse.json({
-      message: 'Shipment created successfully',
-      shipment: newShipment,
-    });
+      return NextResponse.json({
+        message: 'Shipment created successfully',
+        shipment: {
+          id: newShipment.id,
+          shipmentNumber: newShipment.shipmentNumber,
+          status: newShipment.status,
+        },
+        // Add redirect information
+        redirect: {
+          url: `/dashboard/shipments/${newShipment.id}`,
+          action: 'created', // This indicates the shipment was just created
+        }
+      });
 
   } catch (error) {
     console.error('Error creating shipment:', error);

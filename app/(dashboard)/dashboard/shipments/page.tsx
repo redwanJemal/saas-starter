@@ -287,34 +287,40 @@ export default function ShipmentsPage() {
       setError('Please select at least one package');
       return;
     }
-
+  
     if (!shipmentForm.shippingAddressId) {
       setError('Please select a shipping address');
       return;
     }
-
+  
     try {
       setCreating(true);
       setError(null);
-
+  
       // Prepare shipment data with proper handling of billingAddressId
       const shipmentData = {
         packageIds: Array.from(selectedPackages),
         ...shipmentForm,
         // Convert "none" to null for billingAddressId
-        billingAddressId: shipmentForm.billingAddressId === 'none' ? null : shipmentForm.billingAddressId,
-        declaredValue: shipmentForm.declaredValue ? parseFloat(shipmentForm.declaredValue) : undefined,
+        billingAddressId: shipmentForm.billingAddressId === 'none' ? 
+          null : shipmentForm.billingAddressId,
+        declaredValue: shipmentForm.declaredValue ? 
+          parseFloat(shipmentForm.declaredValue) : undefined,
       };
-
+  
       const response = await fetch('/api/customer/shipments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(shipmentData),
       });
-
+  
       if (response.ok) {
         const data = await response.json();
+        
+        // Show success message
         setSuccess(`Shipment ${data.shipment.shipmentNumber} created successfully!`);
+        
+        // Close dialog and reset form
         setIsCreateDialogOpen(false);
         setSelectedPackages(new Set());
         setShipmentForm({
@@ -326,8 +332,20 @@ export default function ShipmentsPage() {
           deliveryInstructions: '',
           requiresSignature: false,
         });
+  
+        // Refresh data
         await fetchPackages();
         await fetchShipments();
+  
+        // Check if we need to redirect based on response
+        if (data.redirect) {
+          // Add a small delay to show success message
+          setTimeout(() => {
+            // Redirect to the shipment detail page
+            window.location.href = data.redirect.url;
+          }, 1500);
+        }
+        
       } else {
         const data = await response.json();
         setError(data.error || 'Failed to create shipment');

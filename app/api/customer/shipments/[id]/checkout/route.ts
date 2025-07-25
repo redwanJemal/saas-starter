@@ -1,10 +1,18 @@
 // app/api/customer/shipments/[id]/checkout/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+
 import { db } from '@/lib/db/drizzle';
-import { shipments, addresses } from '@/lib/db/schema';
-import { getUserWithProfile } from '@/lib/db/queries';
+import { 
+  shipments, 
+  addresses, 
+  customerProfiles,
+  shipmentPackages,
+  packages
+} from '@/lib/db/schema';
 import { stripe } from '@/lib/payments/stripe';
-import { eq, and, or } from 'drizzle-orm';
+import { StorageFeeCalculator } from '@/lib/services/storage-fee-calculator';
+import { NextRequest, NextResponse } from 'next/server';
+import { and, eq } from 'drizzle-orm';
+import { getUserWithProfile } from '@/lib/db/queries';
 
 export async function POST(
   request: NextRequest,
@@ -18,7 +26,7 @@ export async function POST(
 
     const shipmentId = params.id;
 
-    // Get shipment details
+    // Get shipment details with current costs
     const shipmentQuery = await db
       .select({
         id: shipments.id,
@@ -26,8 +34,14 @@ export async function POST(
         status: shipments.status,
         totalCost: shipments.totalCost,
         costCurrency: shipments.costCurrency,
+        shippingCost: shipments.shippingCost,
+        insuranceCost: shipments.insuranceCost,
+        handlingFee: shipments.handlingFee,
+        storageFee: shipments.storageFee,
         quoteExpiresAt: shipments.quoteExpiresAt,
         shippingAddressId: shipments.shippingAddressId,
+        rateCalculationDetails: shipments.rateCalculationDetails,
+        createdAt: shipments.createdAt
       })
       .from(shipments)
       .where(
@@ -47,10 +61,10 @@ export async function POST(
 
     const shipment = shipmentQuery[0];
 
-    // Validate shipment status
+    // Check if shipment is in valid status for payment
     if (shipment.status !== 'quoted') {
       return NextResponse.json(
-        { error: 'Shipment must be quoted before checkout' },
+        { error: 'Shipment is not ready for payment' },
         { status: 400 }
       );
     }
@@ -63,15 +77,59 @@ export async function POST(
       );
     }
 
+    // Get packages for real-time storage fee calculation
+    const packageQuery = await db
+      .select({
+        id: packages.id,
+        internalId: packages.internalId,
+        warehouseId: packages.warehouseId,
+        receivedAt: packages.receivedAt
+      })
+      .from(shipmentPackages)
+      .innerJoin(packages, eq(shipmentPackages.packageId, packages.id))
+      .where(eq(shipmentPackages.shipmentId, shipmentId));
+
+    // Recalculate storage fees to ensure accuracy at payment time
+    const currentStorageFees = await StorageFeeCalculator.calculateStorageFees({
+      packages: packageQuery,
+      tenantId: userWithProfile.customerProfile.tenantId
+    });
+
+    // Check if storage fees have changed significantly (more than $1 difference)
+    const currentStorageFee = currentStorageFees.totalStorageFee;
+    const quotedStorageFee = parseFloat(shipment.storageFee || '0');
+    const storageFeeChange = Math.abs(currentStorageFee - quotedStorageFee);
+
+    let updatedTotalCost = parseFloat(shipment.totalCost || '0');
+
+    // Update storage fee if it has changed significantly
+    if (storageFeeChange > 1.00) {
+      const shippingCost = parseFloat(shipment.shippingCost || '0');
+      const insuranceCost = parseFloat(shipment.insuranceCost || '0');
+      const handlingFee = parseFloat(shipment.handlingFee || '0');
+      
+      updatedTotalCost = shippingCost + insuranceCost + handlingFee + currentStorageFee;
+
+      // Update shipment with new storage fee and total cost
+      await db
+        .update(shipments)
+        .set({
+          storageFee: currentStorageFee.toString(),
+          totalCost: updatedTotalCost.toString(),
+          updatedAt: new Date()
+        })
+        .where(eq(shipments.id, shipmentId));
+    }
+
     // Validate total cost
-    if (!shipment.totalCost || parseFloat(shipment.totalCost) <= 0) {
+    if (updatedTotalCost <= 0) {
       return NextResponse.json(
         { error: 'Invalid shipment cost' },
         { status: 400 }
       );
     }
 
-    // Get shipping address for description
+    // Get shipping address for payment description
     const addressQuery = await db
       .select({
         city: addresses.city,
@@ -84,12 +142,12 @@ export async function POST(
 
     const shippingAddress = addressQuery[0];
     const destination = shippingAddress 
-      ? `${shippingAddress.city}, ${shippingAddress.countryCode}`
+      ? `${shippingAddress.city}, ${shippingAddress.countryCode}` 
       : 'International';
 
     // Create Stripe payment intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(parseFloat(shipment.totalCost) * 100), // Convert to cents
+      amount: Math.round(updatedTotalCost * 100), // Convert to cents
       currency: shipment.costCurrency?.toLowerCase() || 'usd',
       automatic_payment_methods: {
         enabled: true,
@@ -99,6 +157,9 @@ export async function POST(
         shipmentNumber: shipment.shipmentNumber,
         customerId: userWithProfile.customerProfile.id,
         tenantId: userWithProfile.customerProfile.tenantId,
+        originalStorageFee: quotedStorageFee.toString(),
+        updatedStorageFee: currentStorageFee.toString(),
+        storageFeeChanged: storageFeeChange > 1.00 ? 'true' : 'false'
       },
       description: `Shipping for ${shipment.shipmentNumber} to ${destination}`,
       receipt_email: userWithProfile.email,
@@ -107,14 +168,23 @@ export async function POST(
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
-      amount: parseFloat(shipment.totalCost),
+      amount: updatedTotalCost,
       currency: shipment.costCurrency || 'USD',
+      storageFeeUpdate: storageFeeChange > 1.00 ? {
+        originalFee: quotedStorageFee,
+        updatedFee: currentStorageFee,
+        change: currentStorageFee - quotedStorageFee,
+        reason: 'Storage fees updated based on current storage duration'
+      } : null,
+      storageBreakdown: currentStorageFees.breakdown,
       shipment: {
         id: shipment.id,
         shipmentNumber: shipment.shipmentNumber,
         destination,
+        packageCount: packageQuery.length
       },
     });
+
   } catch (error) {
     console.error('Error creating checkout session:', error);
     return NextResponse.json(
@@ -154,6 +224,8 @@ export async function GET(
         rateCalculationDetails: shipments.rateCalculationDetails,
         shippingAddressId: shipments.shippingAddressId,
         billingAddressId: shipments.billingAddressId,
+        baseShippingRate: shipments.baseShippingRate,
+        weightShippingRate: shipments.weightShippingRate,
       })
       .from(shipments)
       .where(
@@ -174,67 +246,96 @@ export async function GET(
     const shipment = shipmentQuery[0];
 
     // Get addresses
-    const addressQuery = await db
+    const addressQueries = await Promise.all([
+      // Shipping address
+      shipment.shippingAddressId ? db
+        .select()
+        .from(addresses)
+        .where(eq(addresses.id, shipment.shippingAddressId))
+        .limit(1) : Promise.resolve([]),
+      
+      // Billing address
+      shipment.billingAddressId ? db
+        .select()
+        .from(addresses)
+        .where(eq(addresses.id, shipment.billingAddressId))
+        .limit(1) : Promise.resolve([])
+    ]);
+
+    const [shippingAddressResult, billingAddressResult] = addressQueries;
+    const shippingAddress = shippingAddressResult[0];
+    const billingAddress = billingAddressResult[0];
+
+    // Get packages for storage breakdown
+    const packageQuery = await db
       .select({
-        id: addresses.id,
-        addressType: addresses.addressType,
-        name: addresses.name,
-        companyName: addresses.companyName,
-        addressLine1: addresses.addressLine1,
-        addressLine2: addresses.addressLine2,
-        city: addresses.city,
-        stateProvince: addresses.stateProvince,
-        postalCode: addresses.postalCode,
-        countryCode: addresses.countryCode,
-        phone: addresses.phone,
-        email: addresses.email,
+        id: packages.id,
+        internalId: packages.internalId,
+        warehouseId: packages.warehouseId,
+        receivedAt: packages.receivedAt,
+        description: packages.description,
+        weightActualKg: packages.weightActualKg
       })
-      .from(addresses)
-      .where(
-        or(
-          eq(addresses.id, shipment.shippingAddressId || ''),
-          eq(addresses.id, shipment.billingAddressId || '')
-        )
-      );
+      .from(shipmentPackages)
+      .innerJoin(packages, eq(shipmentPackages.packageId, packages.id))
+      .where(eq(shipmentPackages.shipmentId, shipmentId));
 
-    const shippingAddress = addressQuery.find(addr => addr.id === shipment.shippingAddressId);
-    const billingAddress = addressQuery.find(addr => addr.id === shipment.billingAddressId);
+    // Get current storage fee breakdown
+    const storageBreakdown = await StorageFeeCalculator.calculateStorageFees({
+      packages: packageQuery,
+      tenantId: userWithProfile.customerProfile.tenantId
+    });
 
-    // Parse rate calculation details
+    // Prepare rate breakdown if available
     let rateBreakdown = null;
     if (shipment.rateCalculationDetails) {
-      try {
-        rateBreakdown = JSON.parse(shipment.rateCalculationDetails as string);
-      } catch (e) {
-        console.warn('Failed to parse rate calculation details');
-      }
+      const details = shipment.rateCalculationDetails as any;
+      rateBreakdown = {
+        baseRate: parseFloat(shipment.baseShippingRate || '0'),
+        weightCharge: parseFloat(shipment.weightShippingRate || '0'),
+        minChargeApplied: details.breakdown?.minChargeApplied || false,
+        chargeableWeightKg: details.breakdown?.chargeableWeightKg || parseFloat(shipment.totalWeightKg || '0'),
+        zoneName: details.zoneName
+      };
     }
 
-    return NextResponse.json({
+    const checkoutData = {
       shipment: {
         id: shipment.id,
         shipmentNumber: shipment.shipmentNumber,
         status: shipment.status,
         serviceType: shipment.serviceType,
-        totalWeightKg: shipment.totalWeightKg ? parseFloat(shipment.totalWeightKg) : 0,
-        quoteExpiresAt: shipment.quoteExpiresAt,
+        totalWeightKg: parseFloat(shipment.totalWeightKg || '0'),
+        quoteExpiresAt: shipment.quoteExpiresAt?.toISOString(),
+        packageCount: packageQuery.length,
+        packages: packageQuery.map(pkg => ({
+          id: pkg.id,
+          internalId: pkg.internalId,
+          description: pkg.description,
+          weight: parseFloat(pkg.weightActualKg?.toString() || '0'),
+          receivedAt: pkg.receivedAt?.toISOString()
+        })),
         costs: {
-          shippingCost: shipment.shippingCost ? parseFloat(shipment.shippingCost) : 0,
-          insuranceCost: shipment.insuranceCost ? parseFloat(shipment.insuranceCost) : 0,
-          handlingFee: shipment.handlingFee ? parseFloat(shipment.handlingFee) : 0,
-          storageFee: shipment.storageFee ? parseFloat(shipment.storageFee) : 0,
-          totalCost: shipment.totalCost ? parseFloat(shipment.totalCost) : 0,
-          currency: shipment.costCurrency || 'USD',
+          shipping: parseFloat(shipment.shippingCost || '0'),
+          insurance: parseFloat(shipment.insuranceCost || '0'),
+          handling: parseFloat(shipment.handlingFee || '0'),
+          storage: parseFloat(shipment.storageFee || '0'),
+          total: parseFloat(shipment.totalCost || '0'),
+          currency: shipment.costCurrency || 'USD'
         },
         rateBreakdown,
+        storageBreakdown: storageBreakdown.breakdown
       },
       shippingAddress,
-      billingAddress,
-    });
+      billingAddress: billingAddress || shippingAddress, // Use shipping address as fallback
+    };
+
+    return NextResponse.json(checkoutData);
+
   } catch (error) {
-    console.error('Error fetching checkout details:', error);
+    console.error('Error fetching checkout data:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch checkout details' },
+      { error: 'Failed to load checkout data' },
       { status: 500 }
     );
   }
