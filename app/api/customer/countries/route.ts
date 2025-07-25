@@ -16,23 +16,24 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '250');
     const search = searchParams.get('search') || '';
 
-    let countriesQuery = db
+    // Build the base query with all conditions first
+    const query = db
       .select({
         id: countries.id,
         code: countries.code,
         name: countries.name,
         region: countries.region,
-        callingCode: countries.callingCode,
+        callingCode: countries.phonePrefix,
+        phonePrefix: countries.phonePrefix,
         isActive: countries.isActive,
       })
       .from(countries)
       .where(eq(countries.isActive, true))
-      .orderBy(countries.name)
-      .limit(limit);
+      .$dynamic();
 
-    // Add search filter if provided
+    // Add search condition if provided
     if (search) {
-      countriesQuery = countriesQuery.where(
+      query.where(
         or(
           ilike(countries.name, `%${search}%`),
           ilike(countries.code, `%${search}%`)
@@ -40,7 +41,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const countriesList = await countriesQuery;
+    // Execute the query with ordering and limit
+    const countriesList = await query
+      .orderBy(countries.name)
+      .limit(limit);
 
     // If no countries found in database, return common defaults
     if (countriesList.length === 0) {

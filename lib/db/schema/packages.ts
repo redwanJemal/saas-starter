@@ -43,6 +43,7 @@ export const packages = pgTable('packages', {
   widthCm: decimal('width_cm', { precision: 8, scale: 2 }),
   heightCm: decimal('height_cm', { precision: 8, scale: 2 }),
   volumetricWeightKg: decimal('volumetric_weight_kg', { precision: 8, scale: 3 }),
+  chargeableWeightKg: decimal('chargeable_weight_kg', { precision: 8, scale: 3 }),
   
   // Status and dates
   status: packageStatusEnum('status').default('expected'),

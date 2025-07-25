@@ -91,8 +91,8 @@ export async function POST(request: NextRequest) {
         code: code.toUpperCase(),
         name,
         region,
-        callingCode,
         isActive: isActive ?? true,
+        phonePrefix: callingCode,
       })
       .returning();
 

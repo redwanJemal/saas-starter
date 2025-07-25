@@ -1,0 +1,1 @@
+ALTER TABLE "packages" ADD COLUMN "chargeable_weight_kg" numeric(8, 3);

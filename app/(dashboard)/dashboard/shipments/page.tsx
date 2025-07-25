@@ -216,13 +216,19 @@ export default function ShipmentsPage() {
 
   const fetchCountries = async () => {
     try {
-      const response = await fetch('/api/countries');
+      const response = await fetch('/api/customer/countries');
       if (response.ok) {
         const data = await response.json();
-        setCountries(data);
+        // Fix: Extract the countries array from the response object
+        setCountries(data.countries || data); // Handle both response formats
+      } else {
+        // Set fallback countries if API fails
+        setCountries([]);
       }
     } catch (error) {
       console.error('Error fetching countries:', error);
+      // Set fallback countries in case of error
+      setCountries([]);
     }
   };
 
@@ -291,14 +297,19 @@ export default function ShipmentsPage() {
       setCreating(true);
       setError(null);
 
+      // Prepare shipment data with proper handling of billingAddressId
+      const shipmentData = {
+        packageIds: Array.from(selectedPackages),
+        ...shipmentForm,
+        // Convert "none" to null for billingAddressId
+        billingAddressId: shipmentForm.billingAddressId === 'none' ? null : shipmentForm.billingAddressId,
+        declaredValue: shipmentForm.declaredValue ? parseFloat(shipmentForm.declaredValue) : undefined,
+      };
+
       const response = await fetch('/api/customer/shipments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          packageIds: Array.from(selectedPackages),
-          ...shipmentForm,
-          declaredValue: shipmentForm.declaredValue ? parseFloat(shipmentForm.declaredValue) : undefined,
-        }),
+        body: JSON.stringify(shipmentData),
       });
 
       if (response.ok) {
@@ -392,6 +403,12 @@ export default function ShipmentsPage() {
 
   // Get country name
   const getCountryName = (countryCode: string) => {
+    // Add defensive check to ensure countries is an array
+    if (!Array.isArray(countries)) {
+      console.warn('Countries is not an array:', countries);
+      return countryCode; // Return country code as fallback
+    }
+    
     const country = countries.find(c => c.code === countryCode);
     return country ? country.name : countryCode;
   };
@@ -765,7 +782,7 @@ export default function ShipmentsPage() {
                       </div>
 
                       {/* Packages in Shipment */}
-                      {shipment.packages.length > 0 && (
+                      {shipment.packages && shipment.packages.length > 0 && (
                         <>
                           <Separator />
                           <div>

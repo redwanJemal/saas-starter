@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Package, Users, Truck, FileText, Settings, Shield, Activity, Menu, Home, MapPin, Warehouse, CreditCard, AlertTriangle, BarChart3, Bell, LogOut, User, ChevronDown, Building2, UserCheck, PackageSearch, TruckIcon, Scan, UserCog, PackageOpen, PackagePlus, ScanLine } from 'lucide-react';
+import { Package, Users, Truck, FileText, Settings, Shield, Activity, Menu, Home, MapPin, Warehouse, CreditCard, AlertTriangle, BarChart3, Bell, LogOut, User, ChevronDown, Building2, UserCheck, PackageSearch, TruckIcon, Scan, UserCog, PackageOpen, PackagePlus, ScanLine, Globe } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import useSWR from 'swr';
@@ -96,6 +96,13 @@ const adminNavItems: AdminNavItem[] = [
     icon: Warehouse,
     label: 'Warehouses',
     description: 'Warehouse operations',
+    section: 'Operations'
+  },
+  {
+    href: '/admin/shipping/zones',
+    icon: Globe,
+    label: 'Shipping Zones',
+    description: 'Manage shipping zones',
     section: 'Operations'
   },
 

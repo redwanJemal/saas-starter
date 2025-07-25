@@ -75,3 +75,7 @@ export const incomingShipmentStatusEnum = pgEnum('incoming_shipment_status', [
 export const itemAssignmentStatusEnum = pgEnum('item_assignment_status', [
   'unassigned', 'assigned', 'received'
 ]);
+
+export const serviceTypeEnum = pgEnum('service_type', [
+  'standard', 'express', 'economy'
+]);

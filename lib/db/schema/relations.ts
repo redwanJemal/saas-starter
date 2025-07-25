@@ -22,6 +22,7 @@ import {
   incomingShipmentItems 
 } from './reference';
 
+import { zones, zoneCountries, shippingRates } from './shipping';
 // =============================================================================
 // RELATIONS
 // =============================================================================
@@ -37,6 +38,40 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   financialInvoices: many(financialInvoices),
   packages: many(packages),
   shipments: many(shipments),
+  zones: many(zones),
+  shippingRates: many(shippingRates),
+}));
+
+export const zonesRelations = relations(zones, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [zones.tenantId],
+    references: [tenants.id],
+  }),
+  countries: many(zoneCountries),
+  shippingRates: many(shippingRates),
+  shipments: many(shipments),
+}));
+
+export const zoneCountriesRelations = relations(zoneCountries, ({ one }) => ({
+  zone: one(zones, {
+    fields: [zoneCountries.zoneId],
+    references: [zones.id],
+  }),
+}));
+
+export const shippingRatesRelations = relations(shippingRates, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [shippingRates.tenantId],
+    references: [tenants.id],
+  }),
+  warehouse: one(warehouses, {
+    fields: [shippingRates.warehouseId],
+    references: [warehouses.id],
+  }),
+  zone: one(zones, {
+    fields: [shippingRates.zoneId],
+    references: [zones.id],
+  }),
 }));
 
 // RBAC relations
@@ -249,20 +284,24 @@ export const shipmentsRelations = relations(shipments, ({ one, many }) => ({
     fields: [shipments.companyId],
     references: [companies.id],
   }),
-  creator: one(users, {
+  // NEW: Zone relation
+  zone: one(zones, {
+    fields: [shipments.zoneId],
+    references: [zones.id],
+  }),
+  createdByUser: one(users, {
     fields: [shipments.createdBy],
     references: [users.id],
+    relationName: 'shipmentCreator'
   }),
-  processor: one(users, {
+  processedByUser: one(users, {
     fields: [shipments.processedBy],
     references: [users.id],
+    relationName: 'shipmentProcessor'
   }),
-  shipmentPackages: many(shipmentPackages),
+  packages: many(shipmentPackages),
   trackingEvents: many(shipmentTrackingEvents),
-  financialInvoice: one(financialInvoices, {
-    fields: [shipments.id],
-    references: [financialInvoices.shipmentId],
-  }),
+  invoices: many(financialInvoices),
 }));
 
 export const shipmentPackagesRelations = relations(shipmentPackages, ({ one }) => ({

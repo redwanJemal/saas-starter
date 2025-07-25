@@ -17,6 +17,7 @@ import {
 } from './schema';
 import { hashPassword } from '@/lib/auth/session';
 import { seedMasterData } from './seed-master-data';
+import { seedShippingZones } from './seed-shipping-zones';
 
 async function seed() {
   console.log('🌱 Starting database seed...');
@@ -24,6 +25,7 @@ async function seed() {
   // 1. Seed master data first (countries, currencies, couriers)
   console.log('📊 Step 1: Seeding master data...');
   await seedMasterData();
+  await seedShippingZones();
 
   // 2. Create default tenant
   const [defaultTenant] = await db.insert(tenants).values({

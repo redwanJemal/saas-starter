@@ -144,7 +144,7 @@ export async function getCustomerShipments(customerProfileId: string, limit = 10
         }
       },
       shippingAddress: true,
-      shipmentPackages: {
+      packages: {
         with: {
           package: {
             columns: {

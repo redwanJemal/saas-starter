@@ -12,6 +12,7 @@ import {
 } from '@/lib/db/schema';
 import { desc, eq, and, or, ilike, sql } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
+import { calculateChargeableWeight, calculateVolumetricWeight } from '@/lib/utils/weight-calculator';
 
 export async function GET(request: NextRequest) {
   try {
@@ -84,6 +85,7 @@ export async function GET(request: NextRequest) {
         widthCm: packages.widthCm,
         heightCm: packages.heightCm,
         volumetricWeightKg: packages.volumetricWeightKg,
+        chargeableWeightKg: packages.chargeableWeightKg,
         status: packages.status,
         expectedArrivalDate: packages.expectedArrivalDate,
         receivedAt: packages.receivedAt,
@@ -219,8 +221,25 @@ export async function POST(request: NextRequest) {
     // Calculate volumetric weight if dimensions provided - Convert to string for decimal field
     let volumetricWeightKg: string | null = null;
     if (lengthCm && widthCm && heightCm) {
-      const volumetricWeight = (lengthCm * widthCm * heightCm) / 5000;
+      const volumetricWeight = calculateVolumetricWeight(
+        parseFloat(lengthCm.toString()),
+        parseFloat(widthCm.toString()),
+        parseFloat(heightCm.toString())
+      );
       volumetricWeightKg = volumetricWeight.toFixed(3); // Convert to string with 3 decimal places
+    }
+    
+    // Calculate chargeable weight (the higher of actual weight and volumetric weight)
+    let chargeableWeightKg: string | null = null;
+    if (weightActualKg || volumetricWeightKg) {
+      const chargeableWeight = calculateChargeableWeight({
+        weightActualKg,
+        lengthCm,
+        widthCm,
+        heightCm,
+        volumetricWeightKg
+      });
+      chargeableWeightKg = chargeableWeight.toFixed(3); // Convert to string with 3 decimal places
     }
 
     // Create the package - All numeric values converted to strings for decimal fields
@@ -245,6 +264,7 @@ export async function POST(request: NextRequest) {
         widthCm: widthCm ? widthCm.toString() : null,
         heightCm: heightCm ? heightCm.toString() : null,
         volumetricWeightKg,
+        chargeableWeightKg,
         estimatedValue: estimatedValue ? estimatedValue.toString() : '0',
         estimatedValueCurrency: estimatedValueCurrency || 'USD',
         

@@ -1,3 +1,4 @@
+// lib/db/schema/index.ts
 // Re-export all schema modules for easy importing
 
 // Constants
@@ -27,7 +28,10 @@ export * from './addresses';
 // Package management
 export * from './packages';
 
-// Shipment management
+// NEW: Shipping zones and rates
+export * from './shipping';
+
+// Shipment management (updated with zones)
 export * from './shipments';
 
 // Financial management

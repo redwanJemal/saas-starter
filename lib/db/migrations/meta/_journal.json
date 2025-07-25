@@ -8,6 +8,20 @@
       "when": 1753418512589,
       "tag": "0000_faulty_supernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1753425703936,
+      "tag": "0001_dusty_human_fly",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1753427974316,
+      "tag": "0002_common_earthquake",
+      "breakpoints": true
     }
   ]
 }
