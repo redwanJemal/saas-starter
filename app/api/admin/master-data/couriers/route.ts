@@ -79,16 +79,15 @@ export async function POST(request: NextRequest) {
     const { 
       name, 
       code, 
-      websiteUrl, 
+      website, 
       trackingUrlTemplate, 
-      supportedCountries, 
-      isActive 
+      isActive = true
     } = body;
 
     // Validate required fields
-    if (!name || !code) {
+    if (!name || !code || !website || !trackingUrlTemplate) {
       return NextResponse.json(
-        { error: 'Name and code are required' },
+        { error: 'Name, code, website and tracking URL template are required' },
         { status: 400 }
       );
     }
@@ -99,10 +98,9 @@ export async function POST(request: NextRequest) {
       .values({
         name,
         code: code.toUpperCase(),
-        websiteUrl,
+        website,
         trackingUrlTemplate,
-        supportedCountries: supportedCountries || [],
-        isActive: isActive ?? true,
+        isActive,
       })
       .returning();
 

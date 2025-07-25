@@ -37,6 +37,9 @@ async function seed() {
 
   // 3. Create permissions
   const permissionData = [
+    // Admin permissions
+    { name: 'Admin Management', slug: 'admin.manage', category: 'admin', action: 'manage' },
+    
     // Package permissions
     { name: 'View Packages', slug: 'packages.read', category: 'packages', action: 'read' },
     { name: 'Create Packages', slug: 'packages.create', category: 'packages', action: 'create' },

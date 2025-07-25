@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         actualArrivalDate: incomingShipments.actualArrivalDate,
         // Courier info
         courierName: couriers.name,
-        courierWebsite: couriers.websiteUrl,
+        courierWebsite: couriers.website, // Fixed: Changed from websiteUrl to website
       })
       .from(incomingShipmentItems)
       .leftJoin(incomingShipments, eq(incomingShipmentItems.incomingShipmentId, incomingShipments.id))
@@ -58,32 +58,51 @@ export async function GET(request: NextRequest) {
       )
       .orderBy(desc(incomingShipmentItems.assignedAt));
 
-    // Format the response data
-    const formattedItems = incomingItems.map(item => ({
-      id: item.id,
-      trackingNumber: item.trackingNumber || '',
-      courierTrackingUrl: item.courierTrackingUrl || '',
-      assignmentStatus: item.assignmentStatus,
-      scannedAt: item.scannedAt?.toISOString() || null,
-      assignedAt: item.assignedAt?.toISOString() || null,
-      description: item.description || '',
-      estimatedValue: item.estimatedValue ? parseFloat(item.estimatedValue) : 0,
-      estimatedValueCurrency: item.estimatedValueCurrency || 'USD',
-      weightKg: item.weightKg ? parseFloat(item.weightKg) : 0,
-      lengthCm: item.lengthCm ? parseFloat(item.lengthCm) : 0,
-      widthCm: item.widthCm ? parseFloat(item.widthCm) : 0,
-      heightCm: item.heightCm ? parseFloat(item.heightCm) : 0,
-      isFragile: item.isFragile || false,
-      isHighValue: item.isHighValue || false,
-      requiresInspection: item.requiresInspection || false,
-      notes: item.notes || '',
-      specialInstructions: item.specialInstructions || '',
-      batchReference: item.batchReference || '',
-      expectedArrivalDate: item.expectedArrivalDate || '',
-      actualArrivalDate: item.actualArrivalDate || '',
-      courierName: item.courierName || '',
-      courierWebsite: item.courierWebsite || '',
-    }));
+    // Format the response data safely
+    const formattedItems = (incomingItems || []).map(item => {
+      // Safely handle each field with null/undefined checks
+      const safeItem = item || {};
+      const safeDate = (date: unknown) => {
+        if (!date) return null;
+        if (date instanceof Date) return date.toISOString();
+        if (typeof date === 'string') return date;
+        return null;
+      };
+      
+      return {
+        id: safeItem.id || '',
+        trackingNumber: safeItem.trackingNumber || '',
+        courierTrackingUrl: safeItem.courierTrackingUrl || '',
+        assignmentStatus: safeItem.assignmentStatus || 'pending',
+        scannedAt: safeDate(safeItem.scannedAt),
+        assignedAt: safeDate(safeItem.assignedAt),
+        description: safeItem.description || '',
+        estimatedValue: safeItem.estimatedValue ? Number(safeItem.estimatedValue) : 0,
+        estimatedValueCurrency: safeItem.estimatedValueCurrency || 'USD',
+        weightKg: safeItem.weightKg ? Number(safeItem.weightKg) : 0,
+        lengthCm: safeItem.lengthCm ? Number(safeItem.lengthCm) : 0,
+        widthCm: safeItem.widthCm ? Number(safeItem.widthCm) : 0,
+        heightCm: safeItem.heightCm ? Number(safeItem.heightCm) : 0,
+        isFragile: Boolean(safeItem.isFragile),
+        isHighValue: Boolean(safeItem.isHighValue),
+        requiresInspection: Boolean(safeItem.requiresInspection),
+        notes: safeItem.notes || '',
+        specialInstructions: safeItem.specialInstructions || '',
+        batchReference: safeItem.batchReference || '',
+        expectedArrivalDate: safeDate(safeItem.expectedArrivalDate)?.split('T')[0] || '',
+        actualArrivalDate: safeDate(safeItem.actualArrivalDate)?.split('T')[0] || '',
+        courierName: safeItem.courierName || '',
+        courierWebsite: safeItem.courierWebsite || '',
+      };
+    });
+
+    // Return empty array if no items found
+    if (!formattedItems || !Array.isArray(formattedItems)) {
+      return NextResponse.json({
+        items: [],
+        total: 0,
+      });
+    }
 
     return NextResponse.json({
       items: formattedItems,

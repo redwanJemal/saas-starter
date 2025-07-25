@@ -133,8 +133,9 @@ export default function AdminShipmentsPage() {
     }).format(amount);
   };
 
-  const formatWeight = (weight: number) => {
-    return `${weight.toFixed(2)} kg`;
+  const formatWeight = (weight: unknown): string => {
+    const num = Number(weight);
+    return Number.isFinite(num) ? `${num.toFixed(1)} kg` : 'N/A';
   };
 
   const formatDate = (dateString: string | null) => {
