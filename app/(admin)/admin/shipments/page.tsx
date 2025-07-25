@@ -126,10 +126,11 @@ export default function AdminShipmentsPage() {
     setPagination(prev => ({ ...prev, page, limit }));
   };
 
-  const formatCurrency = (amount: number, currency: string) => {
+  const formatCurrency = (amount: number, currency: string | null = 'USD') => {
+    const currencyCode = currency || 'USD';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency || 'USD'
+      currency: currencyCode
     }).format(amount);
   };
 
@@ -254,8 +255,10 @@ export default function AdminShipmentsPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem>
-              <Eye className="mr-2 h-4 w-4" />
-              View Details
+            <Link className='flex items-center gap-2' href={`/admin/shipments/${row.original.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Details
+                </Link>
             </DropdownMenuItem>
             <DropdownMenuItem>
               <Edit className="mr-2 h-4 w-4" />

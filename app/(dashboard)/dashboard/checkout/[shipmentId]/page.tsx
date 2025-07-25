@@ -278,11 +278,11 @@ export default function CheckoutPage() {
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
                   <span>Base Rate</span>
-                  <span>{shipment.costs.currency} {shipment.rateBreakdown.baseRate.toFixed(2)}</span>
+                  <span>{shipment.costs.currency} {shipment.rateBreakdown.baseRate}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Weight Charge ({shipment.totalWeightKg} kg)</span>
-                  <span>{shipment.costs.currency} {shipment.rateBreakdown.weightCharge.toFixed(2)}</span>
+                  <span>{shipment.costs.currency} {shipment.rateBreakdown.weightCharge}</span>
                 </div>
                 {shipment.rateBreakdown.minChargeApplied && (
                   <div className="flex justify-between text-sm text-muted-foreground">
@@ -308,27 +308,27 @@ export default function CheckoutPage() {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span>Shipping</span>
-                  <span>{shipment.costs.currency} {shipment.costs.shippingCost.toFixed(2)}</span>
+                  <span>{shipment.costs.currency} {shipment.costs.shippingCost}</span>
                 </div>
                 
                 {shipment.costs.insuranceCost > 0 && (
                   <div className="flex justify-between">
                     <span>Insurance</span>
-                    <span>{shipment.costs.currency} {shipment.costs.insuranceCost.toFixed(2)}</span>
+                    <span>{shipment.costs.currency} {shipment.costs.insuranceCost}</span>
                   </div>
                 )}
                 
                 {shipment.costs.handlingFee > 0 && (
                   <div className="flex justify-between">
                     <span>Handling Fee</span>
-                    <span>{shipment.costs.currency} {shipment.costs.handlingFee.toFixed(2)}</span>
+                    <span>{shipment.costs.currency} {shipment.costs.handlingFee}</span>
                   </div>
                 )}
                 
                 {shipment.costs.storageFee > 0 && (
                   <div className="flex justify-between">
                     <span>Storage Fee</span>
-                    <span>{shipment.costs.currency} {shipment.costs.storageFee.toFixed(2)}</span>
+                    <span>{shipment.costs.currency} {shipment.costs.storageFee}</span>
                   </div>
                 )}
               </div>
@@ -337,7 +337,7 @@ export default function CheckoutPage() {
               
               <div className="flex justify-between text-lg font-semibold">
                 <span>Total</span>
-                <span>{shipment.costs.currency} {shipment.costs.totalCost.toFixed(2)}</span>
+                <span>{shipment.costs.currency} {shipment.costs.totalCost}</span>
               </div>
             </CardContent>
           </Card>
@@ -365,7 +365,7 @@ export default function CheckoutPage() {
                 ) : (
                   <>
                     <CreditCard className="mr-2 h-4 w-4" />
-                    Pay {shipment.costs.currency} {shipment.costs.totalCost.toFixed(2)}
+                    Pay {shipment.costs.currency} {shipment.costs.totalCost}
                   </>
                 )}
               </Button>

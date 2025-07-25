@@ -29,6 +29,13 @@
       "when": 1753451295434,
       "tag": "0003_white_hellcat",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1753453427966,
+      "tag": "0004_worthless_shinko_yamashiro",
+      "breakpoints": true
     }
   ]
 }

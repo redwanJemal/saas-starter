@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Package, Eye, Edit, MoreHorizontal, Truck, XCircle, Plus, Download, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Package, Eye, Edit, MoreHorizontal, Truck, XCircle, Plus, Download, AlertCircle, CheckCircle, Clock, MapPin } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import Link from 'next/link';
 
@@ -223,35 +223,39 @@ export default function AdminPackagesPage() {
     },
     {
       id: 'actions',
-      header: '',
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>
-              <Eye className="mr-2 h-4 w-4" />
-              View Details
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Package
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Truck className="mr-2 h-4 w-4" />
-              Create Shipment
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600">
-              <XCircle className="mr-2 h-4 w-4" />
-              Mark as Missing
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
+      header: 'Actions',
+      cell: ({ row }) => {
+        const packageData = row.original;
+        
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>
+                <Link className='flex items-center gap-2' href={`/admin/packages/${packageData.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Details
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Link className='flex items-center gap-2' href={`/admin/packages/${packageData.id}/edit`}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Package
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => {/* Handle bin assignment */}}>
+                <MapPin className="mr-2 h-4 w-4" />
+                Assign Bin Location
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
   ];
 

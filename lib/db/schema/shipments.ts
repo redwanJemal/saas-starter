@@ -103,6 +103,22 @@ export const shipmentTrackingEvents = pgTable('shipment_tracking_events', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// Shipment status history tracking
+export const shipmentStatusHistory = pgTable('shipment_status_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  shipmentId: uuid('shipment_id').references(() => shipments.id, { onDelete: 'cascade' }).notNull(),
+  status: shipmentStatusEnum('status').notNull(),
+  previousStatus: shipmentStatusEnum('previous_status'),
+  notes: text('notes'),
+  changedBy: uuid('changed_by').references(() => users.id),
+  changedAt: timestamp('changed_at').notNull().defaultNow(),
+  // Additional context
+  trackingNumber: varchar('tracking_number', { length: 255 }), // If tracking was updated
+  carrierName: varchar('carrier_name', { length: 255 }), // If carrier was updated
+  // Metadata
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 // Type exports
 export type Shipment = InferSelectModel<typeof shipments>;
 export type NewShipment = InferInsertModel<typeof shipments>;
@@ -110,3 +126,5 @@ export type ShipmentPackage = InferSelectModel<typeof shipmentPackages>;
 export type NewShipmentPackage = InferInsertModel<typeof shipmentPackages>;
 export type ShipmentTrackingEvent = InferSelectModel<typeof shipmentTrackingEvents>;
 export type NewShipmentTrackingEvent = InferInsertModel<typeof shipmentTrackingEvents>;
+export type ShipmentStatusHistory = InferSelectModel<typeof shipmentStatusHistory>;
+export type NewShipmentStatusHistory = InferInsertModel<typeof shipmentStatusHistory>;
