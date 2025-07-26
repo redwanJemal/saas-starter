@@ -72,6 +72,7 @@ export const packages = pgTable('packages', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+
 export const packageDocuments = pgTable('package_documents', {
   id: uuid('id').primaryKey().defaultRandom(),
   packageId: uuid('package_id').references(() => packages.id, { onDelete: 'cascade' }).notNull(),

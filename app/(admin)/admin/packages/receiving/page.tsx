@@ -10,23 +10,32 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Package, 
   Search, 
   Users, 
   Truck, 
-  Calendar,
-  Scale,
-  DollarSign,
-  AlertTriangle,
-  Shield,
-  FileSignature,
-  Ban,
-  Loader2,
-  CheckCircle,
-  ExternalLink
+  Calendar, 
+  Scale, 
+  DollarSign, 
+  AlertTriangle, 
+  Shield, 
+  FileSignature, 
+  Ban, 
+  Loader2, 
+  CheckCircle, 
+  ExternalLink,
+  Camera,
+  FileText,
+  Save
 } from 'lucide-react';
 import Link from 'next/link';
+import { PackageBasicInfo } from './components/PackageBasicInfo';
+import { PackageMeasurements } from './components/PackageMeasurements';
+import { PackageDeclaration } from './components/PackageDeclaration';
+import PictureUpload from './components/package-image-upload';
+import { PackageStatus } from './components/PackageStatus';
 
 interface AssignedItem {
   id: string;
@@ -48,305 +57,304 @@ interface AssignedItem {
   courierCode?: string;
 }
 
-interface Currency {
-  id: string;
-  code: string;
-  name: string;
-  symbol: string;
-}
-
-interface Warehouse {
-  id: string;
-  name: string;
-  code: string;
+interface PackageFormData {
+  // Basic Info
+  description: string;
+  senderName: string;
+  senderCompany: string;
+  senderAddress: string;
+  
+  // Measurements
+  weightActualKg: number;
+  dimensionsLengthCm: number;
+  dimensionsWidthCm: number;
+  dimensionsHeightCm: number;
+  
+  // Declaration
+  estimatedValue: number;
+  estimatedValueCurrency: string;
+  customsDescription: string;
+  
+  // Status
+  status: string;
+  statusNotes: string;
+  
+  // Compliance
+  hasProhibitedItems: boolean;
+  requiresInspection: boolean;
+  inspectionNotes: string;
+  
+  // System
+  receivedAt: string;
 }
 
 export default function PackageReceivingPage() {
-  // States
   const [assignedItems, setAssignedItems] = useState<AssignedItem[]>([]);
-  const [currencies, setCurrencies] = useState<Currency[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [selectedItem, setSelectedItem] = useState<AssignedItem | null>(null);
-  
-  // Search and pagination
-  const [search, setSearch] = useState('');
-  const [selectedWarehouse, setSelectedWarehouse] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-
-  // Package form data
-  const [packageForm, setPackageForm] = useState({
+  const [totalPages, setTotalPages] = useState(0);
+  
+  // Form data
+  const [formData, setFormData] = useState<PackageFormData>({
     description: '',
-    weightActualKg: '',
-    lengthCm: '',
-    widthCm: '',
-    heightCm: '',
-    estimatedValue: '',
-    estimatedValueCurrency: 'USD',
-    warehouseNotes: '',
-    specialInstructions: '',
-    isFragile: false,
-    isHighValue: false,
-    requiresAdultSignature: false,
-    isRestricted: false
+    senderName: '',
+    senderCompany: '',
+    senderAddress: '',
+    weightActualKg: 0,
+    dimensionsLengthCm: 0,
+    dimensionsWidthCm: 0,
+    dimensionsHeightCm: 0,
+    estimatedValue: 0,
+    estimatedValueCurrency: 'GBP',
+    customsDescription: '',
+    status: 'received',
+    statusNotes: '',
+    hasProhibitedItems: false,
+    requiresInspection: false,
+    inspectionNotes: '',
+    receivedAt: new Date().toISOString().slice(0, 16)
   });
 
   useEffect(() => {
     fetchAssignedItems();
-    fetchCurrencies();
-    fetchWarehouses();
-  }, [search, selectedWarehouse, currentPage]);
+  }, [currentPage, searchQuery]);
 
   const fetchAssignedItems = async () => {
     try {
+      setLoading(true);
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        limit: '10',
-        ...(search && { search }),
-        ...(selectedWarehouse && { warehouseId: selectedWarehouse })
+        limit: '20',
+        status: 'assigned', // Only show assigned items ready for receiving
+        ...(searchQuery && { search: searchQuery })
       });
 
       const response = await fetch(`/api/admin/packages/assigned-items?${params}`);
       if (!response.ok) throw new Error('Failed to fetch assigned items');
-      
+
       const data = await response.json();
-      setAssignedItems(data.assignedItems);
-      setTotalPages(data.pagination.pages);
+      setAssignedItems(data.assignedItems || []);
+      setTotalPages(Math.ceil((data.pagination?.total || 0) / 20));
     } catch (error) {
       console.error('Error fetching assigned items:', error);
+      alert('Error loading assigned items. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCurrencies = async () => {
-    try {
-      const response = await fetch('/api/admin/master-data/currencies?limit=100');
-      if (!response.ok) throw new Error('Failed to fetch currencies');
-      
-      const data = await response.json();
-      setCurrencies(data.currencies);
-    } catch (error) {
-      console.error('Error fetching currencies:', error);
-    }
+  const handleItemSelect = (item: AssignedItem) => {
+    setSelectedItem(item);
+    // Pre-fill form with any existing data
+    setFormData(prev => ({
+      ...prev,
+      // You might want to fetch existing package data here if it exists
+    }));
   };
 
-  const fetchWarehouses = async () => {
-    try {
-      const response = await fetch('/api/admin/warehouses?limit=100');
-      if (!response.ok) throw new Error('Failed to fetch warehouses');
-      
-      const data = await response.json();
-      setWarehouses(data.warehouses);
-    } catch (error) {
-      console.error('Error fetching warehouses:', error);
-    }
-  };
+  const handleFormSubmit = async () => {
+    if (!selectedItem) return;
 
-  const handleCreatePackage = async (item: AssignedItem) => {
-    if (!packageForm.weightActualKg) {
-      alert('Weight is required to create a package');
-      return;
-    }
-
-    setCreating(true);
     try {
-      const response = await fetch('/api/admin/packages', {
+      setSaving(true);
+
+      // Create the complete package record
+      const response = await fetch(`/api/admin/packages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
-          incomingShipmentItemId: item.id,
-          ...packageForm,
-          weightActualKg: parseFloat(packageForm.weightActualKg),
-          lengthCm: packageForm.lengthCm ? parseFloat(packageForm.lengthCm) : null,
-          widthCm: packageForm.widthCm ? parseFloat(packageForm.widthCm) : null,
-          heightCm: packageForm.heightCm ? parseFloat(packageForm.heightCm) : null,
-          estimatedValue: packageForm.estimatedValue ? parseFloat(packageForm.estimatedValue) : 0,
+          // Link to the assigned item
+          incomingShipmentItemId: selectedItem.id,
+          
+          // Customer info from the assigned item
+          customerProfileId: selectedItem.customerProfileId,
+          warehouseId: selectedItem.warehouseId,
+          
+          // Tracking info
+          trackingNumberInbound: selectedItem.trackingNumber,
+          senderTrackingUrl: selectedItem.courierTrackingUrl,
+          
+          // Form data
+          ...formData,
+          
+          // Mark as received
+          status: 'received'
         })
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create package');
+        throw new Error('Failed to create package record');
       }
 
-      const result = await response.json();
-      alert('Package created successfully!');
+      const packageData = await response.json();
       
-      // Reset form and refresh data
-      setSelectedItem(null);
-      setPackageForm({
-        description: '',
-        weightActualKg: '',
-        lengthCm: '',
-        widthCm: '',
-        heightCm: '',
-        estimatedValue: '',
-        estimatedValueCurrency: 'USD',
-        warehouseNotes: '',
-        specialInstructions: '',
-        isFragile: false,
-        isHighValue: false,
-        requiresAdultSignature: false,
-        isRestricted: false
+      // Update the assigned item status to 'received'
+      await fetch(`/api/admin/incoming-shipment-items/${selectedItem.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          assignmentStatus: 'received'
+        })
       });
+
+      alert('Package receiving completed successfully!');
       
+      // Clear selection and refresh list
+      setSelectedItem(null);
+      resetForm();
       fetchAssignedItems();
+
     } catch (error) {
-      console.error('Error creating package:', error);
-      alert(error instanceof Error ? error.message : 'Failed to create package');
+      console.error('Error saving package:', error);
+      alert('Error saving package. Please try again.');
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+  const resetForm = () => {
+    setFormData({
+      description: '',
+      senderName: '',
+      senderCompany: '',
+      senderAddress: '',
+      weightActualKg: 0,
+      dimensionsLengthCm: 0,
+      dimensionsWidthCm: 0,
+      dimensionsHeightCm: 0,
+      estimatedValue: 0,
+      estimatedValueCurrency: 'GBP',
+      customsDescription: '',
+      status: 'received',
+      statusNotes: '',
+      hasProhibitedItems: false,
+      requiresInspection: false,
+      inspectionNotes: '',
+      receivedAt: new Date().toISOString().slice(0, 16)
+    });
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="mx-auto px-4 py-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Package Receiving</h1>
+        <h1 className="text-2xl font-bold mb-2">Package Receiving</h1>
         <p className="text-gray-600">
-          Complete package details for assigned items. Items must be assigned to customers before packages can be created.
+          Complete the full receiving process for assigned packages
         </p>
       </div>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <Label htmlFor="search">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="search"
-                  placeholder="Search by tracking number, customer name..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div className="sm:w-64">
-              <Label htmlFor="warehouse">Warehouse</Label>
-              <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All warehouses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">All warehouses</SelectItem>
-                  {warehouses.map((warehouse) => (
-                    <SelectItem key={warehouse.id} value={warehouse.id}>
-                      {warehouse.name} ({warehouse.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Assigned Items List */}
-        <div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Sidebar - Assigned Items List */}
+        <div className="lg:col-span-1">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
-                Assigned Items Ready for Receiving
-                <Badge variant="secondary">{assignedItems.length}</Badge>
+                Assigned Items
+                <Badge variant="outline">{assignedItems.length}</Badge>
               </CardTitle>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search tracking numbers..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin" />
-                  <span className="ml-2">Loading assigned items...</span>
                 </div>
               ) : assignedItems.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>No assigned items ready for receiving</p>
-                  <p className="text-sm">Items must be assigned to customers first</p>
+                <div className="text-center py-8">
+                  <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">No assigned items found</p>
                   <Link href="/admin/packages/assignment">
-                    <Button variant="outline" className="mt-4">
+                    <Button variant="outline" size="sm" className="mt-2">
                       Go to Assignment
                     </Button>
                   </Link>
                 </div>
               ) : (
-                <div className="space-y-4 max-h-96 overflow-y-auto">
+                <div className="space-y-2 max-h-96 overflow-y-auto">
                   {assignedItems.map((item) => (
-                    <div 
-                      key={item.id} 
-                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                        selectedItem?.id === item.id 
+                    <div
+                      key={item.id}
+                      className={`
+                        p-3 border rounded-lg cursor-pointer transition-colors
+                        ${selectedItem?.id === item.id 
                           ? 'border-blue-500 bg-blue-50' 
                           : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setSelectedItem(item)}
+                        }
+                      `}
+                      onClick={() => handleItemSelect(item)}
                     >
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <div className="font-medium text-sm">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm">
                             {item.trackingNumber}
-                            {item.courierTrackingUrl && (
-                              <Link 
-                                href={item.courierTrackingUrl} 
-                                target="_blank"
-                                className="ml-2 text-blue-600 hover:text-blue-800"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <ExternalLink className="h-3 w-3 inline" />
-                              </Link>
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {item.customerName} ({item.customerId})
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {item.courierName && `${item.courierName} • `}
-                            Assigned: {formatDate(item.assignedAt)}
-                          </div>
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {item.courierCode || 'Unknown'}
+                          </Badge>
                         </div>
-                        <Badge variant="outline" className="text-green-700 border-green-300">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Assigned
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Batch: {item.batchReference} • {item.warehouseName}
+                        <p className="text-xs text-gray-600">
+                          {item.customerName} ({item.customerId})
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Assigned: {new Date(item.assignedAt).toLocaleDateString()}
+                        </p>
+                        {item.courierTrackingUrl && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(item.courierTrackingUrl, '_blank');
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Track
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-
+              
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex justify-between items-center mt-4 pt-4 border-t">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
                   >
                     Previous
                   </Button>
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-gray-500">
                     Page {currentPage} of {totalPages}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
                   >
                     Next
                   </Button>
@@ -356,220 +364,166 @@ export default function PackageReceivingPage() {
           </Card>
         </div>
 
-        {/* Package Creation Form */}
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Create Package
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!selectedItem ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Select an assigned item to create a package</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Selected Item Info */}
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <h4 className="font-medium mb-2">Selected Item</h4>
-                    <div className="text-sm space-y-1">
-                      <div><strong>Tracking:</strong> {selectedItem.trackingNumber}</div>
-                      <div><strong>Customer:</strong> {selectedItem.customerName} ({selectedItem.customerId})</div>
-                      <div><strong>Courier:</strong> {selectedItem.courierName || 'N/A'}</div>
-                      <div><strong>Warehouse:</strong> {selectedItem.warehouseName}</div>
+        {/* Main Content - Package Details Form */}
+        <div className="lg:col-span-2">
+          {selectedItem ? (
+            <div className="space-y-6">
+              {/* Header */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Package Receiving
+                    </div>
+                    <Badge variant="outline">
+                      {selectedItem.trackingNumber}
+                    </Badge>
+                  </CardTitle>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Customer:</span>{' '}
+                      <span className="font-medium">
+                        {selectedItem.customerName} ({selectedItem.customerId})
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Warehouse:</span>{' '}
+                      <span className="font-medium">
+                        {selectedItem.warehouseName}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Courier:</span>{' '}
+                      <span className="font-medium">
+                        {selectedItem.courierName || 'Unknown'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Scanned:</span>{' '}
+                      <span className="font-medium">
+                        {new Date(selectedItem.scannedAt).toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
+                </CardHeader>
+              </Card>
 
-                  {/* Package Form */}
-                  <div className="space-y-4">
-                    {/* Description */}
-                    <div>
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea
-                        id="description"
-                        placeholder="Package description (e.g., iPhone 15, Nike shoes...)"
-                        value={packageForm.description}
-                        onChange={(e) => setPackageForm(prev => ({ ...prev, description: e.target.value }))}
-                      />
+              {/* Tabbed Form */}
+              <Tabs defaultValue="basic" className="space-y-4">
+                <TabsList className="grid w-full grid-cols-5">
+                  <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                  <TabsTrigger value="measurements">Measurements</TabsTrigger>
+                  <TabsTrigger value="declaration">Declaration</TabsTrigger>
+                  <TabsTrigger value="pictures">Pictures</TabsTrigger>
+                  <TabsTrigger value="status">Status</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="basic">
+                  <PackageBasicInfo
+                    formData={formData}
+                    onChange={(updates) => setFormData(prev => ({ ...prev, ...updates }))}
+                  />
+                </TabsContent>
+
+                <TabsContent value="measurements">
+                  <PackageMeasurements
+                    formData={formData}
+                    onChange={(updates) => setFormData(prev => ({ ...prev, ...updates }))}
+                  />
+                </TabsContent>
+
+                <TabsContent value="declaration">
+                  <PackageDeclaration
+                    formData={formData}
+                    onChange={(updates) => setFormData(prev => ({ ...prev, ...updates }))}
+                  />
+                </TabsContent>
+
+                <TabsContent value="pictures">
+                  <PictureUpload
+                    packageId={selectedItem.id}
+                    maxFiles={10}
+                    onUploadComplete={(pictures) => {
+                      console.log('Pictures uploaded:', pictures);
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent value="status">
+                  <PackageStatus
+                    formData={formData}
+                    onChange={(updates) => setFormData(prev => ({ ...prev, ...updates }))}
+                  />
+                </TabsContent>
+              </Tabs>
+
+              {/* Save Button */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                      Complete the package receiving process to make it available for shipping.
                     </div>
-
-                    {/* Weight - Required */}
-                    <div>
-                      <Label htmlFor="weight">Weight (kg) *</Label>
-                      <Input
-                        id="weight"
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={packageForm.weightActualKg}
-                        onChange={(e) => setPackageForm(prev => ({ ...prev, weightActualKg: e.target.value }))}
-                        required
-                      />
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedItem(null);
+                          resetForm();
+                        }}
+                        disabled={saving}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleFormSubmit}
+                        disabled={saving || !formData.description || !formData.weightActualKg}
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Complete Receiving
+                          </>
+                        )}
+                      </Button>
                     </div>
-
-                    {/* Dimensions */}
-                    <div>
-                      <Label>Dimensions (cm)</Label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Input
-                          type="number"
-                          step="0.1"
-                          placeholder="Length"
-                          value={packageForm.lengthCm}
-                          onChange={(e) => setPackageForm(prev => ({ ...prev, lengthCm: e.target.value }))}
-                        />
-                        <Input
-                          type="number"
-                          step="0.1"
-                          placeholder="Width"
-                          value={packageForm.widthCm}
-                          onChange={(e) => setPackageForm(prev => ({ ...prev, widthCm: e.target.value }))}
-                        />
-                        <Input
-                          type="number"
-                          step="0.1"
-                          placeholder="Height"
-                          value={packageForm.heightCm}
-                          onChange={(e) => setPackageForm(prev => ({ ...prev, heightCm: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Estimated Value */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label htmlFor="value">Estimated Value</Label>
-                        <Input
-                          id="value"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={packageForm.estimatedValue}
-                          onChange={(e) => setPackageForm(prev => ({ ...prev, estimatedValue: e.target.value }))}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="currency">Currency</Label>
-                        <Select 
-                          value={packageForm.estimatedValueCurrency} 
-                          onValueChange={(value) => setPackageForm(prev => ({ ...prev, estimatedValueCurrency: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {currencies.map((currency) => (
-                              <SelectItem key={currency.id} value={currency.code}>
-                                {currency.code} - {currency.name} ({currency.symbol})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Warehouse Notes */}
-                    <div>
-                      <Label htmlFor="warehouse-notes">Warehouse Notes</Label>
-                      <Textarea
-                        id="warehouse-notes"
-                        placeholder="Internal notes for warehouse staff..."
-                        value={packageForm.warehouseNotes}
-                        onChange={(e) => setPackageForm(prev => ({ ...prev, warehouseNotes: e.target.value }))}
-                      />
-                    </div>
-
-                    {/* Special Instructions */}
-                    <div>
-                      <Label htmlFor="special-instructions">Special Instructions</Label>
-                      <Textarea
-                        id="special-instructions"
-                        placeholder="Customer-visible special handling instructions..."
-                        value={packageForm.specialInstructions}
-                        onChange={(e) => setPackageForm(prev => ({ ...prev, specialInstructions: e.target.value }))}
-                      />
-                    </div>
-
-                    {/* Package Flags */}
-                    <div className="space-y-3">
-                      <Label>Package Characteristics</Label>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="fragile"
-                          checked={packageForm.isFragile}
-                          onCheckedChange={(checked) => setPackageForm(prev => ({ ...prev, isFragile: checked as boolean }))}
-                        />
-                        <Label htmlFor="fragile" className="flex items-center gap-2 cursor-pointer">
-                          <AlertTriangle className="h-4 w-4 text-orange-500" />
-                          Fragile - Handle with care
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="high-value"
-                          checked={packageForm.isHighValue}
-                          onCheckedChange={(checked) => setPackageForm(prev => ({ ...prev, isHighValue: checked as boolean }))}
-                        />
-                        <Label htmlFor="high-value" className="flex items-center gap-2 cursor-pointer">
-                          <DollarSign className="h-4 w-4 text-green-500" />
-                          High Value - Secure handling
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="adult-signature"
-                          checked={packageForm.requiresAdultSignature}
-                          onCheckedChange={(checked) => setPackageForm(prev => ({ ...prev, requiresAdultSignature: checked as boolean }))}
-                        />
-                        <Label htmlFor="adult-signature" className="flex items-center gap-2 cursor-pointer">
-                          <FileSignature className="h-4 w-4 text-blue-500" />
-                          Requires Adult Signature
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="restricted"
-                          checked={packageForm.isRestricted}
-                          onCheckedChange={(checked) => setPackageForm(prev => ({ ...prev, isRestricted: checked as boolean }))}
-                        />
-                        <Label htmlFor="restricted" className="flex items-center gap-2 cursor-pointer">
-                          <Ban className="h-4 w-4 text-red-500" />
-                          Restricted Item
-                        </Label>
-                      </div>
-                    </div>
-
-                    {/* Create Package Button */}
-                    <Button 
-                      onClick={() => handleCreatePackage(selectedItem)}
-                      disabled={creating || !packageForm.weightActualKg}
-                      className="w-full"
-                    >
-                      {creating ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Creating Package...
-                        </>
-                      ) : (
-                        <>
-                          <Package className="mr-2 h-4 w-4" />
-                          Create Package
-                        </>
-                      )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Select a Package to Receive
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Choose an assigned item from the left to begin the receiving process.
+                </p>
+                <div className="space-y-2">
+                  <Link href="/admin/packages/assignment">
+                    <Button variant="outline">
+                      <Users className="mr-2 h-4 w-4" />
+                      Go to Assignment
                     </Button>
-                  </div>
+                  </Link>
+                  <Link href="/admin/packages/pre-receiving">
+                    <Button variant="outline">
+                      <Search className="mr-2 h-4 w-4" />
+                      Pre-Receiving
+                    </Button>
+                  </Link>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
