@@ -129,7 +129,7 @@ export default function PackageDetailPage() {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Package Not Found</h2>
           <p className="text-gray-600 mb-4">{error || 'The requested package could not be found.'}</p>
-          <Button onClick={() => router.push('/admin/packages')}>
+          <Button onClick={() => router.push('/dashboard/packages')}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Packages
           </Button>
