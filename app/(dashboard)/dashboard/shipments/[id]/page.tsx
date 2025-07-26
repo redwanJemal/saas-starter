@@ -314,12 +314,12 @@ export default function ShipmentDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Box className="h-5 w-5" />
-                Packages ({shipment.packages.length})
+                Packages ({shipment.packages?.length || 0})
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {shipment.packages.map((pkg) => (
+                {shipment.packages && shipment.packages.length > 0 ? shipment.packages.map((pkg) => (
                   <div key={pkg.id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
@@ -341,7 +341,7 @@ export default function ShipmentDetailPage() {
                       Value: {formatCurrency(pkg.estimatedValue, pkg.estimatedValueCurrency)}
                     </div>
                   </div>
-                ))}
+                )) : <p className="text-muted-foreground text-center py-4">No packages in this shipment</p>}
               </div>
             </CardContent>
           </Card>

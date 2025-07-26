@@ -214,8 +214,10 @@ export default function AdminShipmentDetailPage() {
     }).format(amount);
   };
 
-  const formatWeight = (weight: number) => {
-    return `${weight.toFixed(3)} kg`;
+  
+  const formatWeight = (weight: unknown): string => {
+    const num = Number(weight);
+    return Number.isFinite(num) ? `${num.toFixed(1)} kg` : 'N/A';
   };
 
   if (loading) {
