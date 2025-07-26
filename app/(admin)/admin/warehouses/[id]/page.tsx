@@ -1,3 +1,4 @@
+// app/admin/warehouses/[id]/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,55 +7,55 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { 
   ArrowLeft, 
   Warehouse, 
   MapPin, 
-  Clock, 
-  DollarSign, 
   Package, 
+  Clock, 
+  CheckCircle, 
   Truck, 
-  Users, 
-  Settings,
-  Edit,
+  Activity, 
+  Settings, 
+  Edit, 
   MoreHorizontal,
-  AlertCircle,
-  CheckCircle,
-  Eye,
-  Activity
+  Building,
+  Mail,
+  Phone
 } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
+import BinLocationsTab from './components/bin-locations-tab';
 
 interface WarehouseDetail {
   id: string;
-  name: string;
   code: string;
+  name: string;
   description?: string;
-  status: string;
+  countryCode: string;
   addressLine1: string;
   addressLine2?: string;
   city: string;
   stateProvince?: string;
   postalCode: string;
-  countryCode: string;
   phone?: string;
   email?: string;
   timezone: string;
   currencyCode: string;
   taxTreatment: string;
-  storageFreeDays: number;
+  storageFreedays: number;
   storageFeePerDay: number;
   maxPackageWeightKg: number;
   maxPackageValue: number;
+  status: string;
   acceptsNewPackages: boolean;
+  operatingHours: any;
   createdAt: string;
   updatedAt: string;
   stats: {
     totalPackages: number;
     pendingPackages: number;
     readyPackages: number;
-    totalShipments: number;
     activeShipments: number;
   };
 }
@@ -62,11 +63,11 @@ interface WarehouseDetail {
 interface RecentPackage {
   id: string;
   internalId: string;
-  status: string;
-  customerName: string;
   senderName: string;
-  receivedAt: string;
+  customerName: string;
+  status: string;
   weightActualKg: number;
+  receivedAt: string;
 }
 
 interface RecentActivity {
@@ -81,7 +82,7 @@ export default function WarehouseDetailPage() {
   const params = useParams();
   const router = useRouter();
   const warehouseId = params.id as string;
-  
+
   const [warehouse, setWarehouse] = useState<WarehouseDetail | null>(null);
   const [recentPackages, setRecentPackages] = useState<RecentPackage[]>([]);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
@@ -95,7 +96,7 @@ export default function WarehouseDetailPage() {
   const fetchWarehouseDetails = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch warehouse details
       const warehouseResponse = await fetch(`/api/admin/warehouses/${warehouseId}`);
       if (!warehouseResponse.ok) {
@@ -128,14 +129,13 @@ export default function WarehouseDetailPage() {
           user: 'Sarah Wilson'
         },
         {
-          id: '3',  
+          id: '3',
           type: 'package_processed',
           description: 'Package PKG-11111 marked as ready to ship',
           timestamp: '6 hours ago',
           user: 'Mike Johnson'
         }
       ]);
-      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -143,71 +143,63 @@ export default function WarehouseDetailPage() {
     }
   };
 
-  const formatCurrency = (amount: number, currency: string) => {
+  const formatCurrency = (amount: number | undefined | null, currency: string) => {
+    if (amount === undefined || amount === null || isNaN(amount)) return 'N/A';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency
+      currency: currency || 'USD' // Fallback to USD if currency is not provided
     }).format(amount);
   };
 
   const formatWeight = (weight: unknown): string => {
     const num = Number(weight);
-    return Number.isFinite(num) ? `${num.toFixed(1)} kg` : 'N/A';
+    return Number.isFinite(num) ? `${num.toFixed(3)} kg` : 'N/A';
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge variant="default" className="flex items-center gap-1">
-          <CheckCircle className="h-3 w-3" />
-          Active
-        </Badge>;
-      case 'inactive':
-        return <Badge variant="secondary">Inactive</Badge>;
-      case 'maintenance':
-        return <Badge variant="outline" className="flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" />
-          Maintenance
-        </Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
+    const statusConfig = {
+      'active': { color: 'bg-green-100 text-green-800', label: 'Active' },
+      'inactive': { color: 'bg-gray-100 text-gray-800', label: 'Inactive' },
+      'maintenance': { color: 'bg-yellow-100 text-yellow-800', label: 'Maintenance' },
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.active;
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+        {config.label}
+      </span>
+    );
   };
 
   const getPackageStatusBadge = (status: string) => {
-    switch (status) {
-      case 'received':
-        return <Badge variant="default">Received</Badge>;
-      case 'processing':
-        return <Badge variant="outline">Processing</Badge>;
-      case 'ready_to_ship':
-        return <Badge variant="default">Ready to Ship</Badge>;
-      case 'shipped':
-        return <Badge variant="secondary">Shipped</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
+    const statusConfig = {
+      'expected': { color: 'bg-gray-100 text-gray-800', label: 'Expected' },
+      'received': { color: 'bg-blue-100 text-blue-800', label: 'Received' },
+      'processing': { color: 'bg-yellow-100 text-yellow-800', label: 'Processing' },
+      'ready_to_ship': { color: 'bg-green-100 text-green-800', label: 'Ready to Ship' },
+      'shipped': { color: 'bg-purple-100 text-purple-800', label: 'Shipped' },
+      'delivered': { color: 'bg-green-100 text-green-800', label: 'Delivered' },
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.expected;
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+        {config.label}
+      </span>
+    );
   };
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Link href="/admin/warehouses">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Warehouses
-            </Button>
-          </Link>
-        </div>
+      <div className="flex-1 p-4 lg:p-8">
         <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="h-8 bg-gray-200 rounded w-1/3" />
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded"></div>
+              <div key={i} className="h-24 bg-gray-200 rounded" />
             ))}
           </div>
-          <div className="h-96 bg-gray-200 rounded"></div>
+          <div className="h-96 bg-gray-200 rounded" />
         </div>
       </div>
     );
@@ -215,20 +207,11 @@ export default function WarehouseDetailPage() {
 
   if (error) {
     return (
-      <div className="p-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Link href="/admin/warehouses">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Warehouses
-            </Button>
-          </Link>
-        </div>
+      <div className="flex-1 p-4 lg:p-8">
         <div className="text-center py-12">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Warehouse</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={fetchWarehouseDetails}>Try Again</Button>
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
         </div>
       </div>
     );
@@ -236,41 +219,27 @@ export default function WarehouseDetailPage() {
 
   if (!warehouse) {
     return (
-      <div className="p-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Link href="/admin/warehouses">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Warehouses
-            </Button>
-          </Link>
-        </div>
+      <div className="flex-1 p-4 lg:p-8">
         <div className="text-center py-12">
           <Warehouse className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Warehouse Not Found</h2>
-          <p className="text-gray-600">The warehouse you're looking for doesn't exist.</p>
+          <p className="text-gray-600">Warehouse not found</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div className="flex-1 p-4 lg:p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <Link href="/admin/warehouses">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Warehouses
-            </Button>
-          </Link>
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">{warehouse.name}</h1>
-              {getStatusBadge(warehouse.status)}
-            </div>
-            <p className="text-gray-600">Code: {warehouse.code} • {warehouse.city}, {warehouse.countryCode}</p>
+            <h1 className="text-2xl font-bold text-gray-900">{warehouse.name}</h1>
+            <p className="text-gray-600">{warehouse.code} • {warehouse.city}, {warehouse.countryCode}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -365,6 +334,7 @@ export default function WarehouseDetailPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="packages">Recent Packages</TabsTrigger>
           <TabsTrigger value="activity">Activity Log</TabsTrigger>
+          <TabsTrigger value="bin-locations">Bin Locations</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -385,6 +355,7 @@ export default function WarehouseDetailPage() {
                     <p className="text-sm text-gray-600">{warehouse.description}</p>
                   </div>
                 )}
+                
                 <div>
                   <p className="text-sm font-medium text-gray-700">Status</p>
                   <div className="flex items-center gap-2 mt-1">
@@ -396,6 +367,7 @@ export default function WarehouseDetailPage() {
                     )}
                   </div>
                 </div>
+                
                 <div>
                   <p className="text-sm font-medium text-gray-700">Created</p>
                   <p className="text-sm text-gray-600">
@@ -425,18 +397,21 @@ export default function WarehouseDetailPage() {
                     {warehouse.postalCode} {warehouse.countryCode}
                   </p>
                 </div>
+                
                 {warehouse.phone && (
                   <div>
                     <p className="text-sm font-medium text-gray-700">Phone</p>
                     <p className="text-sm text-gray-600">{warehouse.phone}</p>
                   </div>
                 )}
+                
                 {warehouse.email && (
                   <div>
                     <p className="text-sm font-medium text-gray-700">Email</p>
                     <p className="text-sm text-gray-600">{warehouse.email}</p>
                   </div>
                 )}
+                
                 <div>
                   <p className="text-sm font-medium text-gray-700">Timezone</p>
                   <p className="text-sm text-gray-600">{warehouse.timezone}</p>
@@ -444,55 +419,52 @@ export default function WarehouseDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Business Settings */}
+            {/* Storage & Pricing */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Business Settings
-                </CardTitle>
+                <CardTitle>Storage & Pricing</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Currency</p>
-                    <p className="text-sm text-gray-600">{warehouse.currencyCode}</p>
+                    <p className="font-medium text-gray-700">Free Storage Days</p>
+                    <p className="text-gray-600">{warehouse.storageFreedays ?? 'N/A'} days</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Tax Treatment</p>
-                    <p className="text-sm text-gray-600 capitalize">{warehouse.taxTreatment.replace('_', ' ')}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Free Storage Days</p>
-                    <p className="text-sm text-gray-600">{warehouse.storageFreeDays} days</p>
+                    <p className="font-medium text-gray-700">Daily Storage Fee</p>
+                    <p className="text-gray-600">
+                      {formatCurrency(warehouse.storageFeePerDay, warehouse.currencyCode)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Storage Fee</p>
-                    <p className="text-sm text-gray-600">
-                      {formatCurrency(warehouse.storageFeePerDay, warehouse.currencyCode)}/day
+                    <p className="font-medium text-gray-700">Max Package Weight</p>
+                    <p className="text-gray-600">{warehouse.maxPackageWeightKg ? `${warehouse.maxPackageWeightKg} kg` : 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-700">Max Package Value</p>
+                    <p className="text-gray-600">
+                      {formatCurrency(warehouse.maxPackageValue, warehouse.currencyCode)}
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Limits & Restrictions */}
+            {/* Operating Information */}
             <Card>
               <CardHeader>
-                <CardTitle>Limits & Restrictions</CardTitle>
+                <CardTitle>Operating Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Max Package Weight</p>
-                  <p className="text-sm text-gray-600">{formatWeight(warehouse.maxPackageWeightKg)}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Max Package Value</p>
-                  <p className="text-sm text-gray-600">
-                    {formatCurrency(warehouse.maxPackageValue, warehouse.currencyCode)}
-                  </p>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="font-medium text-gray-700">Currency</p>
+                    <p className="text-gray-600">{warehouse.currencyCode}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-700">Tax Treatment</p>
+                    <p className="text-gray-600 capitalize">{warehouse.taxTreatment.replace('_', ' ')}</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -502,15 +474,10 @@ export default function WarehouseDetailPage() {
         <TabsContent value="packages" className="space-y-4">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Recent Packages</CardTitle>
-                <Link href={`/admin/packages?warehouse_id=${warehouse.id}`}>
-                  <Button variant="outline" size="sm">
-                    <Eye className="mr-2 h-4 w-4" />
-                    View All
-                  </Button>
-                </Link>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Recent Packages
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {recentPackages.length > 0 ? (
@@ -538,7 +505,7 @@ export default function WarehouseDetailPage() {
                         </div>
                         <Link href={`/admin/packages/${pkg.id}`}>
                           <Button variant="outline" size="sm">
-                            <Eye className="h-4 w-4" />
+                            <Package className="h-4 w-4" />
                           </Button>
                         </Link>
                       </div>
@@ -596,6 +563,10 @@ export default function WarehouseDetailPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="bin-locations" className="space-y-4">
+          <BinLocationsTab warehouseId={warehouseId} />
+        </TabsContent>
+
         <TabsContent value="settings" className="space-y-4">
           <Card>
             <CardHeader>
@@ -614,25 +585,25 @@ export default function WarehouseDetailPage() {
                     </p>
                   </div>
                   <Badge variant={warehouse.acceptsNewPackages ? "default" : "secondary"}>
-                    {warehouse.acceptsNewPackages ? "Enabled" : "Disabled"}
+                    {warehouse.acceptsNewPackages ? 'Enabled' : 'Disabled'}
                   </Badge>
                 </div>
                 
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                    <h4 className="font-medium">Operating Status</h4>
+                    <h4 className="font-medium">Status</h4>
                     <p className="text-sm text-gray-600">
-                      Current operational status of the warehouse
+                      Current operational status of this warehouse
                     </p>
                   </div>
                   {getStatusBadge(warehouse.status)}
                 </div>
-
+                
                 <div className="pt-4">
                   <Link href={`/admin/warehouses/${warehouse.id}/edit`}>
                     <Button>
                       <Edit className="mr-2 h-4 w-4" />
-                      Edit Settings
+                      Edit Warehouse Settings
                     </Button>
                   </Link>
                 </div>

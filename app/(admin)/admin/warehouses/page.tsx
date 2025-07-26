@@ -240,12 +240,16 @@ export default function AdminWarehousesPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem>
-              <Eye className="mr-2 h-4 w-4" />
-              View Details
+              <Link className='flex items-center gap-2' href={`/admin/warehouses/${row.original.id}`}>
+                <Eye className="mr-2 h-4 w-4" />
+                View Details
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Warehouse
+              <Link className='flex items-center gap-2' href={`/admin/warehouses/${row.original.id}/edit`}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Warehouse
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
