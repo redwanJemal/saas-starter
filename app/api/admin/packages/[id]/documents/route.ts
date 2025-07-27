@@ -1,111 +1,159 @@
 // app/api/admin/packages/[id]/documents/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
-import { packageDocuments, packages } from '@/lib/db/schema';
+import { packages, packageDocuments, documents } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { requireAdminUser } from '@/lib/auth/admin';
+import { DocumentUploadService } from '@/lib/services/documentUploadService';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  // Define documentsToInsert in outer scope so it's accessible in catch block
-  let documentsToInsert: any[] = [];
-
   try {
     // Check authentication and admin role
     const adminUser = await requireAdminUser();
-    console.log('Admin user authenticated:', adminUser.id);
-
+    
     // Await params
     const { id: packageId } = await params;
-    console.log('Package ID:', packageId);
-
+    
     const body = await request.json();
-    console.log('Received documents payload:', body);
+    console.log('Received payload:', body);
 
-    // Extract documents array from payload
-    // Handle both formats: direct array or { documents: [] }
-    const documents = Array.isArray(body) ? body : body.documents;
+    // Handle different payload formats
+    let documentIds: string[] = [];
+    let sessionId = '';
+    let documentType = 'picture';
 
-    // Validate payload structure
-    if (!documents || !Array.isArray(documents)) {
+    if (body.sessionId) {
+      // New format: convert temporary documents to package documents
+      sessionId = body.sessionId;
+      documentType = body.documentType || 'picture';
+      
+      const uploadService = new DocumentUploadService();
+      const result = await uploadService.convertTemporaryToPackageDocuments(
+        sessionId,
+        packageId,
+        documentType,
+        adminUser.id
+      );
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: 400 }
+        );
+      }
+
+      // Get the attached documents
+      const attachedDocuments = await db
+        .select({
+          id: packageDocuments.id,
+          documentType: packageDocuments.documentType,
+          fileName: documents.fileName,
+          fileUrl: documents.fileUrl,
+          fileSize: documents.fileSize,
+          mimeType: documents.mimeType,
+          isPublic: documents.isPublic,
+          uploadedAt: documents.uploadedAt,
+        })
+        .from(packageDocuments)
+        .innerJoin(documents, eq(packageDocuments.documentId, documents.id))
+        .where(
+          and(
+            eq(packageDocuments.packageId, packageId),
+            eq(packageDocuments.documentType, documentType)
+          )
+        );
+
+      return NextResponse.json({
+        success: true,
+        documents: attachedDocuments,
+        message: `${result.documentCount} document(s) attached successfully`,
+      });
+
+    } else if (body.documentIds && Array.isArray(body.documentIds)) {
+      // Direct document ID attachment
+      documentIds = body.documentIds;
+      documentType = body.documentType || 'picture';
+
+      const uploadService = new DocumentUploadService();
+      const result = await uploadService.attachDocumentsToPackage(
+        packageId,
+        documentIds,
+        documentType,
+        adminUser.id
+      );
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: 400 }
+        );
+      }
+
+      // Get the attached documents
+      const attachedDocuments = await db
+        .select({
+          id: packageDocuments.id,
+          documentType: packageDocuments.documentType,
+          fileName: documents.fileName,
+          fileUrl: documents.fileUrl,
+          fileSize: documents.fileSize,
+          mimeType: documents.mimeType,
+          isPublic: documents.isPublic,
+          uploadedAt: documents.uploadedAt,
+        })
+        .from(packageDocuments)
+        .innerJoin(documents, eq(packageDocuments.documentId, documents.id))
+        .where(eq(packageDocuments.packageId, packageId));
+
+      return NextResponse.json({
+        success: true,
+        documents: attachedDocuments,
+        message: `${documentIds.length} document(s) attached successfully`,
+      });
+
+    } else {
+      // Legacy format: direct document upload (deprecated but supported)
+      const documentsPayload = Array.isArray(body) ? body : body.documents;
+      
+      if (!documentsPayload || !Array.isArray(documentsPayload)) {
+        return NextResponse.json(
+          { error: 'Invalid payload format. Use sessionId or documentIds.' },
+          { status: 400 }
+        );
+      }
+
+      // Verify package exists
+      const [existingPackage] = await db
+        .select({ id: packages.id })
+        .from(packages)
+        .where(eq(packages.id, packageId))
+        .limit(1);
+
+      if (!existingPackage) {
+        return NextResponse.json(
+          { error: 'Package not found' },
+          { status: 404 }
+        );
+      }
+
+      // This is legacy support - create documents and attach them directly
+      // In production, you should phase this out in favor of the new flow
       return NextResponse.json(
-        { error: 'Documents array is required' },
+        { error: 'Legacy upload format is deprecated. Please use the new document upload flow.' },
         { status: 400 }
       );
     }
 
-    // Verify package exists
-    const [existingPackage] = await db
-      .select({ id: packages.id })
-      .from(packages)
-      .where(eq(packages.id, packageId))
-      .limit(1);
-
-    if (!existingPackage) {
-      return NextResponse.json(
-        { error: 'Package not found' },
-        { status: 404 }
-      );
-    }
-
-    // Prepare documents for insertion
-    documentsToInsert = documents.map((doc: any) => ({
-      packageId: packageId,
-      documentType: doc.documentType || 'picture',
-      fileName: doc.fileName,
-      fileUrl: doc.fileUrl,
-      fileSize: doc.fileSize || null,
-      mimeType: doc.mimeType || null,
-      isPublic: doc.isPublic ?? true,
-      uploadedBy: adminUser.id,
-      uploadedAt: new Date(),
-    }));
-
-    // Validate required fields
-    for (const doc of documentsToInsert) {
-      if (!doc.fileName || !doc.fileUrl) {
-        return NextResponse.json(
-          { error: 'fileName and fileUrl are required for each document' },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Insert documents into database
-    const insertedDocuments = await db
-      .insert(packageDocuments)
-      .values(documentsToInsert)
-      .returning({
-        id: packageDocuments.id,
-        packageId: packageDocuments.packageId,
-        documentType: packageDocuments.documentType,
-        fileName: packageDocuments.fileName,
-        fileUrl: packageDocuments.fileUrl,
-        fileSize: packageDocuments.fileSize,
-        mimeType: packageDocuments.mimeType,
-        isPublic: packageDocuments.isPublic,
-        uploadedAt: packageDocuments.uploadedAt,
-      });
-
-    console.log('Documents inserted successfully:', insertedDocuments);
-
-    return NextResponse.json({
-      success: true,
-      documents: insertedDocuments,
-      message: `${insertedDocuments.length} document(s) added successfully`,
-    });
-
   } catch (error) {
-    console.error('Error creating package documents:', error);
-    
+    console.error('Error managing package documents:', error);
     return NextResponse.json(
       { 
-        error: 'Failed to create package documents',
-        details: process.env.NODE_ENV === 'development' 
-          ? (error instanceof Error ? error.message : String(error)) 
-          : undefined 
+        error: 'Failed to manage package documents',
+        details: process.env.NODE_ENV === 'development' ? 
+          (error instanceof Error ? error.message : String(error)) : undefined
       },
       { status: 500 }
     );
@@ -118,41 +166,50 @@ export async function GET(
 ) {
   try {
     // Check authentication and admin role
-    const adminUser = await requireAdminUser();
+    await requireAdminUser();
 
     // Await params
     const { id: packageId } = await params;
     const { searchParams } = new URL(request.url);
     const documentType = searchParams.get('type');
 
-    // Build the base query
-    const query = db
+    // Build query with joins
+    const baseQuery = db
       .select({
         id: packageDocuments.id,
         documentType: packageDocuments.documentType,
-        fileName: packageDocuments.fileName,
-        fileUrl: packageDocuments.fileUrl,
-        fileSize: packageDocuments.fileSize,
-        mimeType: packageDocuments.mimeType,
-        isPublic: packageDocuments.isPublic,
-        uploadedAt: packageDocuments.uploadedAt
+        isPrimary: packageDocuments.isPrimary,
+        displayOrder: packageDocuments.displayOrder,
+        attachedAt: packageDocuments.attachedAt,
+        // Document details
+        documentId: documents.id,
+        fileName: documents.fileName,
+        originalFileName: documents.originalFileName,
+        fileUrl: documents.fileUrl,
+        fileSize: documents.fileSize,
+        mimeType: documents.mimeType,
+        isPublic: documents.isPublic,
+        uploadedAt: documents.uploadedAt,
       })
-      .from(packageDocuments);
-
+      .from(packageDocuments)
+      .innerJoin(documents, eq(packageDocuments.documentId, documents.id));
+      
     // Apply filters
-    const conditions = [eq(packageDocuments.packageId, packageId)];
-    
+    let packageDocs;
     if (documentType) {
-      conditions.push(eq(packageDocuments.documentType, documentType));
+      packageDocs = await baseQuery.where(
+        and(
+          eq(packageDocuments.packageId, packageId),
+          eq(packageDocuments.documentType, documentType)
+        )
+      );
+    } else {
+      packageDocs = await baseQuery.where(eq(packageDocuments.packageId, packageId));
     }
-
-    // Apply the where clause with all conditions
-    const filteredQuery = query.where(and(...conditions));
-    const documents = await filteredQuery;
 
     return NextResponse.json({
       success: true,
-      documents
+      documents: packageDocs
     });
 
   } catch (error) {

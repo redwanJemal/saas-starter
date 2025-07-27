@@ -105,6 +105,13 @@ const adminNavItems: AdminNavItem[] = [
     description: 'Manage shipping zones',
     section: 'Operations'
   },
+  {
+    href: '/admin/shipping/rates',
+    icon: Truck,
+    label: 'Shipping Rates',
+    description: 'Manage shipping rates',
+    section: 'Operations'
+  },
 
   // Customer Management
   {

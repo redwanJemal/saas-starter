@@ -72,20 +72,6 @@ export const packages = pgTable('packages', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-
-export const packageDocuments = pgTable('package_documents', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  packageId: uuid('package_id').references(() => packages.id, { onDelete: 'cascade' }).notNull(),
-  documentType: varchar('document_type', { length: 50 }).notNull(),
-  fileName: varchar('file_name', { length: 255 }).notNull(),
-  fileSize: integer('file_size'),
-  mimeType: varchar('mime_type', { length: 100 }),
-  fileUrl: varchar('file_url', { length: 500 }),
-  isPublic: boolean('is_public').default(false),
-  uploadedBy: uuid('uploaded_by').references(() => users.id),
-  uploadedAt: timestamp('uploaded_at').notNull().defaultNow(),
-});
-
 export const packageStatusHistory = pgTable('package_status_history', {
   id: uuid('id').primaryKey().defaultRandom(),
   packageId: uuid('package_id').references(() => packages.id, { onDelete: 'cascade' }).notNull(),
@@ -99,9 +85,6 @@ export const packageStatusHistory = pgTable('package_status_history', {
 // Type exports
 export type Package = InferSelectModel<typeof packages>;
 export type NewPackage = InferInsertModel<typeof packages>;
-
-export type PackageDocument = InferSelectModel<typeof packageDocuments>;
-export type NewPackageDocument = InferInsertModel<typeof packageDocuments>;
 
 export type PackageStatusHistory = InferSelectModel<typeof packageStatusHistory>;
 export type NewPackageStatusHistory = InferInsertModel<typeof packageStatusHistory>;

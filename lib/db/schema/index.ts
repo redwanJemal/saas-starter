@@ -52,5 +52,8 @@ export * from './storage';
 // Global reference tables
 export * from './reference';
 
+// Documents
+export * from './documents';
+
 // Relations
 export * from './relations';

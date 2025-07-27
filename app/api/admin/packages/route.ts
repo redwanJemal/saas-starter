@@ -1,151 +1,144 @@
 // app/api/admin/packages/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
-import { 
-  packages, 
-  customerProfiles, 
-  users, 
-  warehouses, 
-  packageStatusHistory,
-  incomingShipmentItems 
-} from '@/lib/db/schema';
-import { desc, eq, and, or, ilike, sql } from 'drizzle-orm';
+import { packages, customerProfiles, users, warehouses, incomingShipmentItems, incomingShipments, couriers, packageStatusHistory } from '@/lib/db/schema';
+import { eq, and, ilike, or, sql, desc, count as countFn } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
-import { calculateChargeableWeight, calculateVolumetricWeight } from '@/lib/utils/weight-calculator';
+import { generatePackageInternalId } from '@/lib/utils/id-generator';
 
 export async function GET(request: NextRequest) {
   try {
-    // Check permission
     await requirePermission('packages.read');
 
     const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || '';
-    const warehouseId = searchParams.get('warehouse_id') || '';
-    
+    const warehouseId = searchParams.get('warehouseId') || '';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
     const offset = (page - 1) * limit;
 
     // Build where conditions
-    let whereConditions = [];
-    
+    let whereConditions: any[] = [];
+
     if (search) {
       whereConditions.push(
         or(
           ilike(packages.internalId, `%${search}%`),
           ilike(packages.trackingNumberInbound, `%${search}%`),
           ilike(packages.description, `%${search}%`),
-          ilike(customerProfiles.customerId, `%${search}%`),
-          ilike(users.firstName, `%${search}%`),
-          ilike(users.lastName, `%${search}%`),
-          ilike(users.email, `%${search}%`)
+          ilike(packages.senderName, `%${search}%`),
+          sql`${users.firstName} || ' ' || ${users.lastName} ILIKE ${`%${search}%`}`,
+          ilike(users.email, `%${search}%`),
+          ilike(customerProfiles.customerId, `%${search}%`)
         )
       );
     }
 
     if (status) {
-      // Ensure status is one of the valid enum values
-      const validStatuses = [
-        'expected', 'received', 'processing', 'ready_to_ship', 
-        'shipped', 'delivered', 'returned', 'disposed', 'missing', 'damaged', 'held'
-      ];
-      
-      if (validStatuses.includes(status)) {
-        whereConditions.push(eq(packages.status, status as any));
-      }
+      whereConditions.push(eq(packages.status, status as any));
     }
 
     if (warehouseId) {
       whereConditions.push(eq(packages.warehouseId, warehouseId));
     }
 
-    // Combine conditions
+    // Build final where clause
     const whereClause = whereConditions.length > 0 
-      ? and(...whereConditions)
+      ? whereConditions.reduce((acc, condition) => acc ? and(acc, condition) : condition, null)
       : undefined;
 
-    // Get packages with related data - Use users table for firstName/lastName
-    const packagesQuery = db
+    // Get packages with customer and warehouse info
+    const packagesQuery = await db
       .select({
-        // Package fields
         id: packages.id,
         internalId: packages.internalId,
-        suiteCodeCaptured: packages.suiteCodeCaptured,
         trackingNumberInbound: packages.trackingNumberInbound,
+        status: packages.status,
         senderName: packages.senderName,
-        senderCompany: packages.senderCompany,
-        senderTrackingUrl: packages.senderTrackingUrl,
         description: packages.description,
-        estimatedValue: packages.estimatedValue,
-        estimatedValueCurrency: packages.estimatedValueCurrency,
         weightActualKg: packages.weightActualKg,
+        chargeableWeightKg: packages.chargeableWeightKg,
         lengthCm: packages.lengthCm,
         widthCm: packages.widthCm,
         heightCm: packages.heightCm,
         volumetricWeightKg: packages.volumetricWeightKg,
-        chargeableWeightKg: packages.chargeableWeightKg,
-        status: packages.status,
-        expectedArrivalDate: packages.expectedArrivalDate,
+        estimatedValue: packages.estimatedValue,
+        estimatedValueCurrency: packages.estimatedValueCurrency,
         receivedAt: packages.receivedAt,
         readyToShipAt: packages.readyToShipAt,
-        storageExpiresAt: packages.storageExpiresAt,
-        warehouseNotes: packages.warehouseNotes,
-        customerNotes: packages.customerNotes,
-        specialInstructions: packages.specialInstructions,
-        isFragile: packages.isFragile,
-        isHighValue: packages.isHighValue,
-        requiresAdultSignature: packages.requiresAdultSignature,
-        isRestricted: packages.isRestricted,
-        processedAt: packages.processedAt,
         createdAt: packages.createdAt,
         updatedAt: packages.updatedAt,
-        
-        // Customer info - Fixed: use users table for firstName/lastName
+        // Customer info
+        customerId: customerProfiles.customerId,
         customerName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
         customerEmail: users.email,
-        customerId: customerProfiles.customerId,
-        
         // Warehouse info
         warehouseName: warehouses.name,
-        warehouseCode: warehouses.code,
-        warehouseCity: warehouses.city,
-        warehouseCountry: warehouses.countryCode,
+        // Courier info
+        courierName: couriers.name,
+        batchReference: incomingShipments.batchReference,
       })
       .from(packages)
       .innerJoin(customerProfiles, eq(packages.customerProfileId, customerProfiles.id))
-      .innerJoin(users, eq(customerProfiles.userId, users.id)) // Join to users table
-      .innerJoin(warehouses, eq(packages.warehouseId, warehouses.id))
+      .innerJoin(users, eq(customerProfiles.userId, users.id))
+      .leftJoin(warehouses, eq(packages.warehouseId, warehouses.id))
+      .leftJoin(incomingShipmentItems, eq(packages.incomingShipmentItemId, incomingShipmentItems.id))
+      .leftJoin(incomingShipments, eq(incomingShipmentItems.incomingShipmentId, incomingShipments.id))
+      .leftJoin(couriers, eq(incomingShipments.courierId, couriers.id))
+      .where(whereClause)
       .orderBy(desc(packages.createdAt))
       .limit(limit)
       .offset(offset);
 
-    if (whereClause) {
-      packagesQuery.where(whereClause);
-    }
-
-    const packagesList = await packagesQuery;
-
     // Get total count for pagination
     const [{ count }] = await db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: countFn() })
       .from(packages)
       .innerJoin(customerProfiles, eq(packages.customerProfileId, customerProfiles.id))
       .innerJoin(users, eq(customerProfiles.userId, users.id))
-      .innerJoin(warehouses, eq(packages.warehouseId, warehouses.id))
+      .leftJoin(warehouses, eq(packages.warehouseId, warehouses.id))
       .where(whereClause);
 
+    // Format packages to ensure proper number handling
+    const formattedPackages = packagesQuery.map(pkg => ({
+      id: pkg.id,
+      internalId: pkg.internalId,
+      trackingNumberInbound: pkg.trackingNumberInbound || '',
+      status: pkg.status,
+      senderName: pkg.senderName || '',
+      description: pkg.description || '',
+      weightActualKg: pkg.weightActualKg ? parseFloat(pkg.weightActualKg.toString()) : null,
+      chargeableWeightKg: pkg.chargeableWeightKg ? parseFloat(pkg.chargeableWeightKg.toString()) : null,
+      lengthCm: pkg.lengthCm ? parseFloat(pkg.lengthCm.toString()) : null,
+      widthCm: pkg.widthCm ? parseFloat(pkg.widthCm.toString()) : null,
+      heightCm: pkg.heightCm ? parseFloat(pkg.heightCm.toString()) : null,
+      volumetricWeightKg: pkg.volumetricWeightKg ? parseFloat(pkg.volumetricWeightKg.toString()) : null,
+      estimatedValue: pkg.estimatedValue ? parseFloat(pkg.estimatedValue.toString()) : null,
+      estimatedValueCurrency: pkg.estimatedValueCurrency || 'USD',
+      receivedAt: pkg.receivedAt?.toISOString() || null,
+      readyToShipAt: pkg.readyToShipAt?.toISOString() || null,
+      createdAt: pkg.createdAt.toISOString(),
+      updatedAt: pkg.updatedAt.toISOString(),
+      customerId: pkg.customerId,
+      customerName: pkg.customerName,
+      customerEmail: pkg.customerEmail,
+      warehouseName: pkg.warehouseName || '',
+      courierName: pkg.courierName || '',
+      batchReference: pkg.batchReference || '',
+    }));
+
+    const totalPages = Math.ceil(Number(count) / limit);
+
     return NextResponse.json({
-      packages: packagesList,
+      packages: formattedPackages,
       pagination: {
         page,
         limit,
-        total: count,
-        pages: Math.ceil(count / limit),
+        total: Number(count),
+        pages: totalPages,
       },
     });
-
   } catch (error) {
     console.error('Error fetching packages:', error);
     return NextResponse.json(
@@ -157,154 +150,152 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check permission  
-    const adminUser = await requirePermission('packages.manage');
-    
+    const adminUser = await requirePermission('packages.create');
     const body = await request.json();
+
     const {
-      incomingShipmentItemId,
+      customerProfileId,
+      warehouseId,
+      trackingNumberInbound,
+      senderName,
+      senderCompany,
       description,
       weightActualKg,
       lengthCm,
       widthCm,
       heightCm,
       estimatedValue,
-      estimatedValueCurrency,
+      estimatedValueCurrency = 'USD',
+      expectedArrivalDate,
       warehouseNotes,
+      customerNotes,
       specialInstructions,
-      isFragile,
-      isHighValue,
-      requiresAdultSignature,
-      isRestricted,
+      isFragile = false,
+      isHighValue = false,
+      requiresAdultSignature = false,
+      isRestricted = false,
+      sessionId, // For document attachment
     } = body;
 
-    // Get the assigned incoming shipment item
-    const assignedItem = await db
-      .select()
-      .from(incomingShipmentItems)
-      .where(eq(incomingShipmentItems.id, incomingShipmentItemId))
-      .limit(1);
-
-    if (!assignedItem.length) {
+    // Validate required fields
+    if (!customerProfileId || !warehouseId || !trackingNumberInbound) {
       return NextResponse.json(
-        { error: 'Incoming shipment item not found' },
-        { status: 404 }
-      );
-    }
-
-    const item = assignedItem[0];
-
-    if (!item.assignedCustomerProfileId) {
-      return NextResponse.json(
-        { error: 'Incoming shipment item is not assigned to a customer' },
+        { error: 'Customer profile ID, warehouse ID, and tracking number are required' },
         { status: 400 }
       );
     }
 
-    // Check if package already exists for this incoming item
-    const existingPackage = await db
-      .select()
-      .from(packages)
-      .where(eq(packages.incomingShipmentItemId, incomingShipmentItemId))
-      .limit(1);
+    // Verify customer exists
+    const customer = await db.query.customerProfiles.findFirst({
+      where: eq(customerProfiles.id, customerProfileId),
+    });
 
-    if (existingPackage.length) {
+    if (!customer) {
       return NextResponse.json(
-        { error: 'Package already exists for this incoming shipment item' },
-        { status: 409 }
+        { error: 'Customer not found' },
+        { status: 404 }
       );
     }
 
-    // Generate internal package ID
-    const internalId = `PKG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    // Verify warehouse exists
+    const warehouse = await db.query.warehouses.findFirst({
+      where: eq(warehouses.id, warehouseId),
+    });
 
-    // Calculate volumetric weight if dimensions provided - Convert to string for decimal field
-    let volumetricWeightKg: string | null = null;
+    if (!warehouse) {
+      return NextResponse.json(
+        { error: 'Warehouse not found' },
+        { status: 404 }
+      );
+    }
+
+    // Calculate volumetric weight if dimensions are provided
+    let volumetricWeightKg = null;
     if (lengthCm && widthCm && heightCm) {
-      const volumetricWeight = calculateVolumetricWeight(
-        parseFloat(lengthCm.toString()),
-        parseFloat(widthCm.toString()),
-        parseFloat(heightCm.toString())
-      );
-      volumetricWeightKg = volumetricWeight.toFixed(3); // Convert to string with 3 decimal places
-    }
-    
-    // Calculate chargeable weight (the higher of actual weight and volumetric weight)
-    let chargeableWeightKg: string | null = null;
-    if (weightActualKg || volumetricWeightKg) {
-      const chargeableWeight = calculateChargeableWeight({
-        weightActualKg,
-        lengthCm,
-        widthCm,
-        heightCm,
-        volumetricWeightKg
-      });
-      chargeableWeightKg = chargeableWeight.toFixed(3); // Convert to string with 3 decimal places
+      // Standard air freight divisor: 6000 for cm³ to kg
+      volumetricWeightKg = (parseFloat(lengthCm) * parseFloat(widthCm) * parseFloat(heightCm)) / 6000;
     }
 
-    // Create the package - All numeric values converted to strings for decimal fields
+    // Calculate chargeable weight (higher of actual or volumetric)
+    let chargeableWeightKg = null;
+    if (weightActualKg || volumetricWeightKg) {
+      const actualWeight = weightActualKg ? parseFloat(weightActualKg) : 0;
+      const volWeight = volumetricWeightKg || 0;
+      chargeableWeightKg = Math.max(actualWeight, volWeight);
+    }
+
+    // Generate internal ID
+    const internalId = generatePackageInternalId();
+
+    // Create package
     const [newPackage] = await db
       .insert(packages)
       .values({
         tenantId: adminUser.tenantId,
-        customerProfileId: item.assignedCustomerProfileId,
-        warehouseId: item.warehouseId,
-        incomingShipmentItemId: incomingShipmentItemId,
         internalId,
-        
-        // Copy tracking info from incoming item
-        trackingNumberInbound: item.trackingNumber,
-        senderTrackingUrl: item.courierTrackingUrl,
-        senderName: item.courierName, // Use courier name as sender initially
-        
-        // Package details
-        description: description || 'Package received via incoming shipment',
+        customerProfileId,
+        warehouseId,
+        trackingNumberInbound,
+        senderName,
+        senderCompany,
+        description,
         weightActualKg: weightActualKg ? weightActualKg.toString() : null,
+        chargeableWeightKg: chargeableWeightKg ? chargeableWeightKg.toString() : null,
         lengthCm: lengthCm ? lengthCm.toString() : null,
         widthCm: widthCm ? widthCm.toString() : null,
         heightCm: heightCm ? heightCm.toString() : null,
-        volumetricWeightKg,
-        chargeableWeightKg,
-        estimatedValue: estimatedValue ? estimatedValue.toString() : '0',
-        estimatedValueCurrency: estimatedValueCurrency || 'USD',
-        
-        // Processing details
-        status: 'received', // Start with received status since it came from incoming
-        receivedAt: sql`now()`,
+        volumetricWeightKg: volumetricWeightKg ? volumetricWeightKg.toString() : null,
+        estimatedValue: estimatedValue ? estimatedValue.toString() : null,
+        estimatedValueCurrency,
+        expectedArrivalDate: expectedArrivalDate ? new Date(expectedArrivalDate) : null,
         warehouseNotes,
+        customerNotes,
         specialInstructions,
-        isFragile: isFragile || false,
-        isHighValue: isHighValue || false,
-        requiresAdultSignature: requiresAdultSignature || false,
-        isRestricted: isRestricted || false,
+        isFragile,
+        isHighValue,
+        requiresAdultSignature,
+        isRestricted,
+        status: 'expected',
         processedBy: adminUser.id,
-        processedAt: sql`now()`,
       })
       .returning();
 
-    // Create status history entry
-    await db
-      .insert(packageStatusHistory)
-      .values({
-        packageId: newPackage.id,
-        status: 'received',
-        notes: 'Package created from assigned incoming shipment item',
-        changedBy: adminUser.id,
-        changeReason: 'package_creation',
-      });
+    // Create initial status history entry
+    await db.insert(packageStatusHistory).values({
+      packageId: newPackage.id,
+      status: 'expected',
+      notes: 'Package created',
+      changedBy: adminUser.id,
+      changeReason: 'package_creation',
+    });
 
-    // Update the incoming shipment item status to 'received'
-    await db
-      .update(incomingShipmentItems)
-      .set({
-        assignmentStatus: 'received',
-        updatedAt: sql`now()`,
-      })
-      .where(eq(incomingShipmentItems.id, incomingShipmentItemId));
+    // Handle document attachment if sessionId provided
+    let documentsAttached = 0;
+    if (sessionId) {
+      try {
+        const { DocumentUploadService } = await import('@/lib/services/documentUploadService');
+        const uploadService = new DocumentUploadService();
+        const result = await uploadService.convertTemporaryToPackageDocuments(
+          sessionId,
+          newPackage.id,
+          'picture',
+          adminUser.id
+        );
+        documentsAttached = result.documentCount || 0;
+      } catch (docError) {
+        console.error('Error attaching documents:', docError);
+        // Don't fail the package creation if documents fail
+      }
+    }
 
     return NextResponse.json({
-      message: 'Package created successfully',
-      package: newPackage,
+      success: true,
+      package: {
+        id: newPackage.id,
+        internalId: newPackage.internalId,
+        status: newPackage.status,
+      },
+      documentsAttached,
     }, { status: 201 });
 
   } catch (error) {

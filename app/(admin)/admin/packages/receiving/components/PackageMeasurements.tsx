@@ -1,4 +1,4 @@
-// components/admin/receiving/PackageMeasurements.tsx
+// app/(admin)/admin/packages/receiving/components/PackageMeasurements.tsx
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,17 +9,17 @@ import { Scale, Ruler, Calculator } from 'lucide-react';
 interface PackageMeasurementsProps {
   formData: {
     weightActualKg: number;
-    dimensionsLengthCm: number;
-    dimensionsWidthCm: number;
-    dimensionsHeightCm: number;
+    lengthCm: number;
+    widthCm: number;
+    heightCm: number;
   };
   onChange: (updates: Partial<PackageMeasurementsProps['formData']>) => void;
 }
 
 export function PackageMeasurements({ formData, onChange }: PackageMeasurementsProps) {
   // Calculate volumetric weight and other metrics
-  const volumetricWeightKg = (formData.dimensionsLengthCm * formData.dimensionsWidthCm * formData.dimensionsHeightCm) / 5000;
-  const volumeLiters = (formData.dimensionsLengthCm * formData.dimensionsWidthCm * formData.dimensionsHeightCm) / 1000;
+  const volumetricWeightKg = (formData.lengthCm * formData.widthCm * formData.heightCm) / 5000;
+  const volumeLiters = (formData.lengthCm * formData.widthCm * formData.heightCm) / 1000;
   const chargeableWeight = Math.max(formData.weightActualKg, volumetricWeightKg);
 
   return (
@@ -74,8 +74,8 @@ export function PackageMeasurements({ formData, onChange }: PackageMeasurementsP
                   step="0.1"
                   min="0"
                   placeholder="0.0"
-                  value={formData.dimensionsLengthCm || ''}
-                  onChange={(e) => onChange({ dimensionsLengthCm: parseFloat(e.target.value) || 0 })}
+                  value={formData.lengthCm || ''}
+                  onChange={(e) => onChange({ lengthCm: parseFloat(e.target.value) || 0 })}
                 />
                 <span className="text-xs text-gray-500">cm</span>
               </div>
@@ -91,8 +91,8 @@ export function PackageMeasurements({ formData, onChange }: PackageMeasurementsP
                   step="0.1"
                   min="0"
                   placeholder="0.0"
-                  value={formData.dimensionsWidthCm || ''}
-                  onChange={(e) => onChange({ dimensionsWidthCm: parseFloat(e.target.value) || 0 })}
+                  value={formData.widthCm || ''}
+                  onChange={(e) => onChange({ widthCm: parseFloat(e.target.value) || 0 })}
                 />
                 <span className="text-xs text-gray-500">cm</span>
               </div>
@@ -108,8 +108,8 @@ export function PackageMeasurements({ formData, onChange }: PackageMeasurementsP
                   step="0.1"
                   min="0"
                   placeholder="0.0"
-                  value={formData.dimensionsHeightCm || ''}
-                  onChange={(e) => onChange({ dimensionsHeightCm: parseFloat(e.target.value) || 0 })}
+                  value={formData.heightCm || ''}
+                  onChange={(e) => onChange({ heightCm: parseFloat(e.target.value) || 0 })}
                 />
                 <span className="text-xs text-gray-500">cm</span>
               </div>
@@ -121,7 +121,7 @@ export function PackageMeasurements({ formData, onChange }: PackageMeasurementsP
         </div>
 
         {/* Calculated Values */}
-        {(formData.weightActualKg > 0 || (formData.dimensionsLengthCm > 0 && formData.dimensionsWidthCm > 0 && formData.dimensionsHeightCm > 0)) && (
+        {(formData.weightActualKg > 0 || (formData.lengthCm > 0 && formData.widthCm > 0 && formData.heightCm > 0)) && (
           <div className="border rounded-lg p-4 bg-gray-50">
             <h4 className="text-sm font-medium mb-3 flex items-center gap-1">
               <Calculator className="h-4 w-4" />

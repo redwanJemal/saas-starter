@@ -1,34 +1,22 @@
-// components/admin/PictureUpload.tsx
-'use client';
-
-import { useState, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// app/(admin)/admin/packages/receiving/components/package-image-upload.tsx
+import React, { useState, useRef, useEffect } from 'react';
+import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Upload, 
-  X, 
-  Image as ImageIcon, 
-  Loader2, 
-  CheckCircle, 
-  AlertCircle,
-  Eye,
-  Trash2
-} from 'lucide-react';
-import Image from 'next/image';
-import { SupabaseUploadService, UploadResult } from '@/lib/services/s3UploadService';
+import { Button } from '@/components/ui/button';
+import { Upload, ImageIcon, X, CheckCircle, AlertCircle } from 'lucide-react';
 
-interface PictureUploadProps {
-  packageId: string;
-  existingPictures?: PackagePicture[];
-  onUploadComplete?: (pictures: PackagePicture[]) => void;
-  maxFiles?: number;
-  disabled?: boolean;
+interface UploadProgress {
+  fileName: string;
+  status: 'uploading' | 'success' | 'error';
+  progress?: number;
+  error?: string;
+  documentId?: string;
+  fileUrl?: string;
 }
 
-interface PackagePicture {
+interface Document {
   id: string;
+  documentId: string;
   fileName: string;
   fileUrl: string;
   fileSize?: number;
@@ -36,92 +24,127 @@ interface PackagePicture {
   uploadedAt: string;
 }
 
-interface UploadProgress {
-  file: File;
-  progress: number;
-  status: 'uploading' | 'success' | 'error';
-  error?: string;
-  result?: UploadResult;
+interface PackagePictureUploadProps {
+  packageId?: string;
+  pictures: Document[];
+  setPictures: (pictures: Document[]) => void;
+  onUploadComplete?: (pictures: Document[]) => void;
+  maxFiles?: number;
+  disabled?: boolean;
+  sessionId?: string;
 }
 
-export default function PictureUpload({
+export default function PackagePictureUpload({
   packageId,
-  existingPictures = [],
+  pictures,
+  setPictures,
   onUploadComplete,
   maxFiles = 10,
-  disabled = false
-}: PictureUploadProps) {
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
+  disabled = false,
+  sessionId: propSessionId
+}: PackagePictureUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const [pictures, setPictures] = useState<PackagePicture[]>(existingPictures);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [dragActive, setDragActive] = useState(false);
-  
+  const [currentSessionId, setCurrentSessionId] = useState<string>(
+    propSessionId || `session_${Date.now()}_${Math.random().toString(36).substring(2)}`
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const uploadService = new SupabaseUploadService();
+
+  useEffect(() => {
+    if (propSessionId && propSessionId !== currentSessionId) {
+      setCurrentSessionId(propSessionId);
+    }
+  }, [propSessionId, currentSessionId]);
 
   const handleFileSelect = async (files: File[]) => {
-    if (disabled || isUploading) return;
+    if (disabled || files.length === 0) return;
 
-    // Check total file limit
-    const totalFiles = pictures.length + files.length;
-    if (totalFiles > maxFiles) {
-      alert(`Maximum ${maxFiles} pictures allowed. You can upload ${maxFiles - pictures.length} more.`);
+    const remainingSlots = maxFiles - pictures.length;
+    if (remainingSlots <= 0) {
+      alert(`Maximum ${maxFiles} pictures allowed`);
       return;
     }
 
-    // Validate files
+    const filesToUpload = files.slice(0, remainingSlots);
     const validFiles: File[] = [];
-    const invalidFiles: string[] = [];
 
-    files.forEach(file => {
-      const validation = uploadService.validatePackagePicture(file);
-      if (validation.valid) {
-        validFiles.push(file);
-      } else {
-        invalidFiles.push(`${file.name}: ${validation.error}`);
+    for (const file of filesToUpload) {
+      if (!file.type.startsWith('image/')) {
+        alert(`${file.name} is not an image file`);
+        continue;
       }
-    });
-
-    if (invalidFiles.length > 0) {
-      alert(`Invalid files:\n${invalidFiles.join('\n')}`);
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`${file.name} is too large (max 10MB)`);
+        continue;
+      }
+      validFiles.push(file);
     }
 
     if (validFiles.length === 0) return;
+    await uploadFiles(validFiles);
+  };
 
-    // Initialize upload progress
-    const progressArray: UploadProgress[] = validFiles.map(file => ({
-      file,
-      progress: 0,
-      status: 'uploading'
-    }));
-
-    setUploadProgress(progressArray);
+  const uploadFiles = async (files: File[]) => {
     setIsUploading(true);
+    
+    const initialProgress: UploadProgress[] = files.map(file => ({
+      fileName: file.name,
+      status: 'uploading',
+      progress: 0
+    }));
+    setUploadProgress(initialProgress);
 
     try {
-      // Upload files
-      const uploadResults = await uploadService.uploadPackagePictures(validFiles, packageId);
-      
-      // Update progress for each file
-      const updatedProgress = progressArray.map((progress, index) => {
-        const result = uploadResults[index];
-        return {
-          ...progress,
-          progress: 100,
-          status: result.success ? 'success' as const : 'error' as const,
-          error: result.error,
-          result
-        };
+      const formData = new FormData();
+      files.forEach(file => formData.append('files', file));
+      formData.append('sessionId', currentSessionId);
+      formData.append('purpose', packageId ? 'package_update' : 'package_creation');
+      formData.append('documentType', 'picture');
+      formData.append('path', `packages/pictures`);
+      formData.append('isPublic', 'true');
+
+      const response = await fetch('/api/admin/documents/upload', {
+        method: 'POST',
+        body: formData
       });
 
-      setUploadProgress(updatedProgress);
-
-      // Save successful uploads to database
-      const successfulUploads = uploadResults.filter(result => result.success);
-      if (successfulUploads.length > 0) {
-        await savePicturesToDatabase(successfulUploads);
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
       }
 
+      const data = await response.json();
+
+      const updatedProgress: UploadProgress[] = files.map((file, index) => {
+        const doc = data.documents[index];
+        return {
+          fileName: file.name,
+          status: doc ? 'success' : 'error',
+          documentId: doc?.documentId,
+          fileUrl: doc?.fileUrl,
+          error: doc ? undefined : data.errors?.[index] || 'Upload failed'
+        };
+      });
+      setUploadProgress(updatedProgress);
+
+      if (packageId && data.documents.length > 0) {
+        await attachDocumentsToPackage(data.sessionId);
+      } else {
+        // Store successful uploads for later attachment
+        const successfulDocs: Document[] = data.documents.map((doc: any) => ({
+          id: doc.documentId,
+          documentId: doc.documentId,
+          fileName: doc.fileName,
+          fileUrl: doc.fileUrl,
+          fileSize: doc.fileSize,
+          mimeType: doc.mimeType,
+          uploadedAt: new Date().toISOString()
+        }));
+        
+        // Fix: Use functional update with proper typing
+        setPictures([...pictures, ...successfulDocs]);
+        onUploadComplete?.([...pictures, ...successfulDocs]);
+      }
     } catch (error) {
       console.error('Upload error:', error);
       setUploadProgress(prev => prev.map(p => ({
@@ -131,82 +154,57 @@ export default function PictureUpload({
       })));
     } finally {
       setIsUploading(false);
-      // Clear progress after 3 seconds
       setTimeout(() => setUploadProgress([]), 3000);
     }
   };
 
-  const savePicturesToDatabase = async (uploadResults: UploadResult[]) => {
+  const attachDocumentsToPackage = async (sessionId: string) => {
     try {
-      // Filter out any results with missing required fields
-      const validResults = uploadResults.filter(result => 
-        result.fileName && result.fileUrl
-      );
-      
-      if (validResults.length === 0) {
-        throw new Error('No valid upload results to save');
-      }
-      
-      // Log what we're sending to the API
-      const documentsToSave = validResults.map(result => ({
-        documentType: 'picture',
-        fileName: result.fileName || `image-${Date.now()}.jpg`, // Fallback filename if missing
-        fileUrl: result.fileUrl,
-        fileSize: result.fileSize,
-        mimeType: result.mimeType || 'image/jpeg',
-        isPublic: true
-      }));
-      
-      console.log('Sending documents to API:', JSON.stringify(documentsToSave, null, 2));
-      console.log('Package ID:', packageId);
-      
       const response = await fetch(`/api/admin/packages/${packageId}/documents`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          documents: documentsToSave
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, documentType: 'picture' })
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('API Error Response:', {
-          status: response.status,
-          statusText: response.statusText,
-          data: errorData
-        });
-        throw new Error(`Failed to save pictures to database: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to attach documents: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      const newPictures = data.documents || [];
+      const newPictures: Document[] = data.documents || [];
       
-      setPictures(prev => [...prev, ...newPictures]);
-      onUploadComplete?.(pictures.concat(newPictures));
-
+      // Fix: Use direct assignment instead of functional update
+      setPictures([...pictures, ...newPictures]);
+      onUploadComplete?.([...pictures, ...newPictures]);
     } catch (error) {
-      console.error('Error saving to database:', error);
-      alert('Pictures uploaded but failed to save to database. Please refresh the page.');
+      console.error('Error attaching documents to package:', error);
+      alert('Pictures uploaded but failed to attach to package. Please refresh the page.');
     }
   };
 
-  const handleDeletePicture = async (pictureId: string) => {
+  const handleDeletePicture = async (picture: Document) => {
     if (!confirm('Are you sure you want to delete this picture?')) return;
 
     try {
-      const response = await fetch(`/api/admin/packages/${packageId}/documents/${pictureId}`, {
-        method: 'DELETE'
-      });
+      let response;
+      if (packageId) {
+        response = await fetch(`/api/admin/packages/${packageId}/documents/${picture.id}`, {
+          method: 'DELETE'
+        });
+      } else {
+        response = await fetch(`/api/admin/documents/${picture.documentId}`, {
+          method: 'DELETE'
+        });
+      }
 
       if (!response.ok) {
         throw new Error('Failed to delete picture');
       }
 
-      setPictures(prev => prev.filter(p => p.id !== pictureId));
-      onUploadComplete?.(pictures.filter(p => p.id !== pictureId));
-
+      // Fix: Use direct assignment for deletion
+      const updatedPictures = pictures.filter(p => p.id !== picture.id);
+      setPictures(updatedPictures);
+      onUploadComplete?.(updatedPictures);
     } catch (error) {
       console.error('Delete error:', error);
       alert('Failed to delete picture');
@@ -226,7 +224,6 @@ export default function PictureUpload({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragActive(false);
-    
     const files = Array.from(e.dataTransfer.files);
     handleFileSelect(files);
   };
@@ -249,6 +246,11 @@ export default function PictureUpload({
           <Badge variant="outline">
             {pictures.length}/{maxFiles}
           </Badge>
+          {!packageId && (
+            <Badge variant="secondary" className="text-xs">
+              Temporary Upload
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -271,12 +273,11 @@ export default function PictureUpload({
           <p className="text-xs text-gray-500">
             JPEG, PNG, WebP up to 10MB each. Max {maxFiles} pictures.
           </p>
-          
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/jpeg,image/jpg,image/png,image/webp"
+            accept="image/*"
             onChange={handleInputChange}
             className="hidden"
             disabled={disabled}
@@ -286,91 +287,70 @@ export default function PictureUpload({
         {/* Upload Progress */}
         {uploadProgress.length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-sm font-medium">Uploading...</h4>
+            <h4 className="text-sm font-medium">Upload Progress</h4>
             {uploadProgress.map((progress, index) => (
-              <div key={index} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="truncate">{progress.file.name}</span>
-                  <div className="flex items-center gap-1">
-                    {progress.status === 'uploading' && (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    )}
-                    {progress.status === 'success' && (
-                      <CheckCircle className="h-3 w-3 text-green-500" />
-                    )}
-                    {progress.status === 'error' && (
-                      <AlertCircle className="h-3 w-3 text-red-500" />
-                    )}
-                    <span>{progress.progress}%</span>
-                  </div>
-                </div>
-                <Progress value={progress.progress} className="h-1" />
-                {progress.error && (
-                  <p className="text-xs text-red-500">{progress.error}</p>
+              <div key={index} className="flex items-center gap-2 text-sm">
+                {progress.status === 'uploading' && (
+                  <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+                )}
+                {progress.status === 'success' && (
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                )}
+                {progress.status === 'error' && (
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                )}
+                <span className="flex-1 truncate">{progress.fileName}</span>
+                {progress.status === 'error' && progress.error && (
+                  <span className="text-red-500 text-xs">{progress.error}</span>
                 )}
               </div>
             ))}
           </div>
         )}
 
-        {/* Existing Pictures */}
+        {/* Pictures Grid */}
         {pictures.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">Uploaded Pictures</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {pictures.map((picture) => (
-                <div key={picture.id} className="relative group">
-                  <div className="aspect-square relative overflow-hidden rounded-lg border">
-                    <Image
-                      src={picture.fileUrl}
-                      alt={picture.fileName}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                    />
-                  </div>
-                  
-                  {/* Overlay with actions */}
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => window.open(picture.fileUrl, '_blank')}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeletePicture(picture.id)}
-                      disabled={disabled}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
-                  {/* File info */}
-                  <div className="mt-1">
-                    <p className="text-xs text-gray-500 truncate">
-                      {picture.fileName}
-                    </p>
-                    {picture.fileSize && (
-                      <p className="text-xs text-gray-400">
-                        {(picture.fileSize / 1024 / 1024).toFixed(1)} MB
-                      </p>
-                    )}
-                  </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {pictures.map((picture) => (
+              <div key={picture.id} className="relative group">
+                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                  <img
+                    src={picture.fileUrl}
+                    alt={picture.fileName}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
                 </div>
-              ))}
-            </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto"
+                  onClick={() => handleDeletePicture(picture)}
+                  disabled={disabled}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+                <p className="mt-1 text-xs text-gray-500 truncate">
+                  {picture.fileName}
+                </p>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Empty state */}
-        {pictures.length === 0 && uploadProgress.length === 0 && (
-          <div className="text-center py-8">
-            <ImageIcon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">No pictures uploaded yet</p>
+        {pictures.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p>No pictures uploaded yet</p>
+          </div>
+        )}
+
+        {/* Status Information */}
+        {!packageId && pictures.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-700">
+              <strong>Note:</strong> Pictures are temporarily stored and will be attached to the package when it's created.
+            </p>
           </div>
         )}
       </CardContent>

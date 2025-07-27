@@ -1,6 +1,19 @@
+// app/api/admin/packages/[id]/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
-import { packages, customerProfiles, users, warehouses, packageStatusHistory, packageDocuments } from '@/lib/db/schema';
+import { 
+  packages, 
+  customerProfiles, 
+  users, 
+  warehouses, 
+  packageStatusHistory, 
+  packageDocuments,
+  documents,
+  incomingShipmentItems,
+  incomingShipments,
+  couriers 
+} from '@/lib/db/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
 
@@ -11,14 +24,16 @@ export async function GET(
   try {
     // Check permission
     await requirePermission('packages.read');
-
+    
+    // Properly await params before using
     const packageId = params.id;
 
-    // Get package details with related data
+    // Get package details with enhanced relationships - optimized query
     const [packageDetails] = await db
       .select({
         // Package fields
         id: packages.id,
+        tenantId: packages.tenantId,
         internalId: packages.internalId,
         suiteCodeCaptured: packages.suiteCodeCaptured,
         trackingNumberInbound: packages.trackingNumberInbound,
@@ -33,11 +48,12 @@ export async function GET(
         widthCm: packages.widthCm,
         heightCm: packages.heightCm,
         volumetricWeightKg: packages.volumetricWeightKg,
+        chargeableWeightKg: packages.chargeableWeightKg,
         status: packages.status,
         expectedArrivalDate: packages.expectedArrivalDate,
         receivedAt: packages.receivedAt,
         readyToShipAt: packages.readyToShipAt,
-        storageExpiresAt: packages.storageExpiresAt,
+        // Additional package characteristics  
         warehouseNotes: packages.warehouseNotes,
         customerNotes: packages.customerNotes,
         specialInstructions: packages.specialInstructions,
@@ -45,23 +61,59 @@ export async function GET(
         isHighValue: packages.isHighValue,
         requiresAdultSignature: packages.requiresAdultSignature,
         isRestricted: packages.isRestricted,
+        storageExpiresAt: packages.storageExpiresAt,
+        processedBy: packages.processedBy,
         processedAt: packages.processedAt,
         createdAt: packages.createdAt,
         updatedAt: packages.updatedAt,
-        // Customer fields
-        customerName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
-        customerEmail: users.email,
+        
+        // Customer profile fields
+        customerProfileId: customerProfiles.id,
         customerId: customerProfiles.customerId,
+        customerFirstName: users.firstName,
+        customerLastName: users.lastName,
+        customerEmail: users.email,
+        customerPhone: users.phone,
+        
         // Warehouse fields
         warehouseName: warehouses.name,
         warehouseCode: warehouses.code,
         warehouseCity: warehouses.city,
-        warehouseCountry: warehouses.countryCode,
+        warehouseCountryCode: warehouses.countryCode,
+        
+        // Processed by user
+        processedByName: sql<string>`
+          CASE 
+            WHEN ${packages.processedBy} IS NOT NULL 
+            THEN (
+              SELECT ${users.firstName} || ' ' || ${users.lastName} 
+              FROM ${users} 
+              WHERE ${users.id} = ${packages.processedBy}
+            )
+            ELSE NULL 
+          END
+        `,
+        
+        // Incoming shipment item details (if exists)
+        incomingShipmentItemId: packages.incomingShipmentItemId,
+        shipmentTrackingNumber: incomingShipmentItems.trackingNumber,
+        shipmentCourierTrackingUrl: incomingShipmentItems.courierTrackingUrl,
+        shipmentScannedAt: incomingShipmentItems.scannedAt,
+        shipmentAssignedAt: incomingShipmentItems.assignedAt,
+        
+        // Incoming shipment details (if exists)
+        shipmentBatchReference: incomingShipments.batchReference,
+        shipmentArrivalDate: incomingShipments.arrivalDate,
+        courierName: couriers.name,
+        courierCode: couriers.code,
       })
       .from(packages)
       .innerJoin(customerProfiles, eq(packages.customerProfileId, customerProfiles.id))
       .innerJoin(users, eq(customerProfiles.userId, users.id))
       .innerJoin(warehouses, eq(packages.warehouseId, warehouses.id))
+      .leftJoin(incomingShipmentItems, eq(packages.incomingShipmentItemId, incomingShipmentItems.id))
+      .leftJoin(incomingShipments, eq(incomingShipmentItems.incomingShipmentId, incomingShipments.id))
+      .leftJoin(couriers, eq(incomingShipments.courierId, couriers.id))
       .where(eq(packages.id, packageId))
       .limit(1);
 
@@ -72,7 +124,7 @@ export async function GET(
       );
     }
 
-    // Get status history
+    // Get status history with user details
     const statusHistory = await db
       .select({
         id: packageStatusHistory.id,
@@ -88,27 +140,82 @@ export async function GET(
       .where(eq(packageStatusHistory.packageId, packageId))
       .orderBy(desc(packageStatusHistory.createdAt));
 
-    // Get documents
-    const documents = await db
+    // Get documents with uploader details (updated schema)
+    const packageDocs = await db
       .select({
         id: packageDocuments.id,
         documentType: packageDocuments.documentType,
-        fileName: packageDocuments.fileName,
-        fileUrl: packageDocuments.fileUrl,
-        fileSizeBytes: packageDocuments.fileSize,
-        mimeType: packageDocuments.mimeType,
+        isPrimary: packageDocuments.isPrimary,
+        displayOrder: packageDocuments.displayOrder,
+        attachedAt: packageDocuments.attachedAt,
+        // Document details from documents table
+        documentId: documents.id,
+        fileName: documents.fileName,
+        originalFileName: documents.originalFileName,
+        fileUrl: documents.fileUrl,
+        fileSize: documents.fileSize,
+        mimeType: documents.mimeType,
+        isPublic: documents.isPublic,
+        uploadedAt: documents.uploadedAt,
         uploadedByName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+        uploadedByEmail: users.email,
       })
       .from(packageDocuments)
-      .leftJoin(users, eq(packageDocuments.uploadedBy, users.id))
+      .innerJoin(documents, eq(packageDocuments.documentId, documents.id))
+      .leftJoin(users, eq(documents.uploadedBy, users.id))
       .where(eq(packageDocuments.packageId, packageId))
-      .orderBy(desc(packageDocuments.uploadedAt));
+      .orderBy(desc(packageDocuments.attachedAt));
 
-    return NextResponse.json({
-      package: packageDetails,
+    // Structure the response
+    const response = {
+      package: {
+        ...packageDetails,
+        // Calculate dimensional weight for display if dimensions exist
+        calculatedVolumetricWeight: packageDetails?.lengthCm && 
+                                   packageDetails?.widthCm && 
+                                   packageDetails?.heightCm
+          ? (Number(packageDetails.lengthCm) * Number(packageDetails.widthCm) * Number(packageDetails.heightCm)) / 5000
+          : null,
+        
+        // Add pre-receiving workflow context
+        preReceivingInfo: packageDetails?.incomingShipmentItemId ? {
+          shipmentBatchReference: packageDetails.shipmentBatchReference,
+          shipmentArrivalDate: packageDetails.shipmentArrivalDate,
+          courierName: packageDetails.courierName,
+          courierCode: packageDetails.courierCode,
+          trackingNumber: packageDetails.shipmentTrackingNumber,
+          courierTrackingUrl: packageDetails.shipmentCourierTrackingUrl,
+          scannedAt: packageDetails.shipmentScannedAt,
+          assignedAt: packageDetails.shipmentAssignedAt,
+        } : null,
+      },
       statusHistory,
-      documents,
-    });
+      documents: packageDocs,
+      
+      // Add metadata for the admin interface
+      metadata: {
+        canEdit: true,
+        canChangeStatus: true,
+        canUploadDocuments: true,
+        canCreateShipment: packageDetails?.status === 'ready_to_ship',
+        availableStatuses: [
+          'expected',
+          'received', 
+          'processing',
+          'ready_to_ship',
+          'shipped',
+          'delivered',
+          'returned',
+          'disposed',
+          'missing',
+          'damaged',
+          'held'
+        ],
+      },
+    };
+
+    return NextResponse.json(response);
+
   } catch (error) {
     console.error('Error fetching package details:', error);
     return NextResponse.json(
@@ -125,13 +232,18 @@ export async function PATCH(
   try {
     // Check permission
     const adminUser = await requirePermission('packages.update');
-
+    
+    // Properly await params before using
     const packageId = params.id;
     const body = await request.json();
 
     // Check if package exists
     const [existingPackage] = await db
-      .select({ id: packages.id, status: packages.status })
+      .select({ 
+        id: packages.id, 
+        status: packages.status,
+        tenantId: packages.tenantId 
+      })
       .from(packages)
       .where(eq(packages.id, packageId))
       .limit(1);
@@ -143,13 +255,37 @@ export async function PATCH(
       );
     }
 
+    // Prepare update data
+    const updateData: any = {
+      ...body,
+      updatedAt: sql`now()`,
+    };
+
+    // Handle special status transitions
+    if (body.status) {
+      switch (body.status) {
+        case 'received':
+          if (!updateData.receivedAt) {
+            updateData.receivedAt = new Date();
+          }
+          if (!updateData.processedBy) {
+            updateData.processedBy = adminUser.id;
+            updateData.processedAt = new Date();
+          }
+          break;
+          
+        case 'ready_to_ship':
+          if (!updateData.readyToShipAt) {
+            updateData.readyToShipAt = new Date();
+          }
+          break;
+      }
+    }
+
     // Update package
     const [updatedPackage] = await db
       .update(packages)
-      .set({
-        ...body,
-        updatedAt: sql`now()`,
-      })
+      .set(updateData)
       .where(eq(packages.id, packageId))
       .returning();
 
@@ -164,7 +300,12 @@ export async function PATCH(
       });
     }
 
-    return NextResponse.json(updatedPackage);
+    // Return updated package summary
+    return NextResponse.json({
+      package: updatedPackage,
+      message: `Package updated successfully`,
+    });
+
   } catch (error) {
     console.error('Error updating package:', error);
     return NextResponse.json(

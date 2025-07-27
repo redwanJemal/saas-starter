@@ -7,7 +7,7 @@ import { users, userRoles } from './users';
 import { customerProfiles, companies } from './customers';
 import { warehouses, customerWarehouseAssignments } from './warehouses';
 import { addresses } from './addresses';
-import { packages, packageDocuments, packageStatusHistory } from './packages';
+import { packages, packageStatusHistory } from './packages';
 import { shipments, shipmentPackages, shipmentTrackingEvents } from './shipments';
 import { financialInvoices, financialInvoiceLines } from './finance';
 import { notifications } from './notifications';
@@ -23,6 +23,7 @@ import {
 } from './reference';
 
 import { zones, zoneCountries, shippingRates } from './shipping';
+import { packageDocuments } from './documents';
 // =============================================================================
 // RELATIONS
 // =============================================================================
@@ -242,7 +243,7 @@ export const packageDocumentsRelations = relations(packageDocuments, ({ one }) =
     references: [packages.id],
   }),
   uploader: one(users, {
-    fields: [packageDocuments.uploadedBy],
+    fields: [packageDocuments.attachedBy],
     references: [users.id],
   }),
 }));

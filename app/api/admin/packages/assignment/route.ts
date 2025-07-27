@@ -89,6 +89,51 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const adminUser = await requirePermission('packages.manage');
+    const body = await request.json();
+    const { itemId, status } = body;
+
+    if (!itemId || !status) {
+      return NextResponse.json(
+        { error: 'Item ID and status are required' },
+        { status: 400 }
+      );
+    }
+
+    // Update the assigned item status
+    const [updatedItem] = await db
+      .update(incomingShipmentItems)
+      .set({
+        assignmentStatus: status,
+        updatedAt: new Date()
+      })
+      .where(eq(incomingShipmentItems.id, itemId))
+      .returning();
+
+    if (!updatedItem) {
+      return NextResponse.json(
+        { error: 'Item not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      item: updatedItem,
+      message: `Item status updated to ${status}`
+    });
+
+  } catch (error) {
+    console.error('Error updating assigned item:', error);
+    return NextResponse.json(
+      { error: 'Failed to update assigned item' },
+      { status: 500 }
+    );
+  }
+}
+
 // Bulk assign packages to customers
 export async function POST(request: NextRequest) {
   try {

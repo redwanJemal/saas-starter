@@ -98,7 +98,7 @@ export default function PackageDetailPage() {
   const fetchPackageDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/admin/packages/${packageId}`);
+      const response = await fetch(`/api/customer/packages/${packageId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch package details');
@@ -138,7 +138,26 @@ export default function PackageDetailPage() {
     );
   }
 
-  const { package: pkg, shipments, documents } = packageData;
+  const pkg = packageData.package;
+  // Initialize empty arrays with proper types for shipments and documents since they're not in the API response
+  const shipments: Array<{
+    id: string;
+    status: string;
+    carrierCode: string;
+    carrierService: string;
+    trackingOutbound: string;
+    declaredValue: number;
+    declaredCurrency: string;
+    createdAt: string;
+  }> = [];
+  
+  const documents: Array<{
+    id: string;
+    fileName: string;
+    fileType: string;
+    storageUrl: string;
+    createdAt: string;
+  }> = [];
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -147,7 +166,7 @@ export default function PackageDetailPage() {
         <div className="flex items-center space-x-4">
           <Button 
             variant="outline" 
-            onClick={() => router.push('/admin/packages')}
+            onClick={() => router.push('/dashboard/packages')}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Packages
@@ -348,9 +367,6 @@ export default function PackageDetailPage() {
             Create Shipment
           </Button>
         )}
-        <Button variant="outline">
-          Edit Package
-        </Button>
       </div>
     </div>
   );
