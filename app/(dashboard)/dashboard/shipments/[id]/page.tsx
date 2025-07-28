@@ -281,12 +281,16 @@ export default function ShipmentDetailPage() {
 
               {/* Action Buttons */}
               <div className="pt-4 flex gap-2">
-                {shipment.status === 'quoted' && (
-                  <Button asChild>
-                    <Link href={`/dashboard/checkout/${shipment.id}`}>
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Proceed to Checkout
-                    </Link>
+                {shipment.status === 'quoted' && 
+                 shipment.totalCost && 
+                 parseFloat(shipment.totalCost.toString()) > 0 && 
+                 (!shipment.quoteExpiresAt || new Date() <= new Date(shipment.quoteExpiresAt)) && (
+                  <Button 
+                    onClick={() => router.push(`/dashboard/checkout/${shipment.id}`)}
+                    className="w-full sm:w-auto"
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Pay Now - {shipment.costCurrency} {parseFloat(shipment.totalCost.toString()).toFixed(2)}
                   </Button>
                 )}
                 
@@ -304,6 +308,17 @@ export default function ShipmentDetailPage() {
                       Commercial Invoice
                     </a>
                   </Button>
+                )}
+                
+                {shipment.status === 'quoted' && 
+                 shipment.quoteExpiresAt && 
+                 new Date() > new Date(shipment.quoteExpiresAt) && (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      This quote has expired. Please contact support to request a new quote.
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
             </CardContent>

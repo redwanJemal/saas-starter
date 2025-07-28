@@ -55,5 +55,8 @@ export * from './reference';
 // Documents
 export * from './documents';
 
+// Personal Shopping
+export * from './personal-shopping';
+
 // Relations
 export * from './relations';

@@ -21,6 +21,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
+import StripePaymentForm from '@/components/stripe/StripePaymentForm';
 
 interface CheckoutData {
   shipment: {
@@ -30,6 +31,7 @@ interface CheckoutData {
     serviceType: string;
     totalWeightKg: number;
     quoteExpiresAt: string;
+    canPay?: boolean;
     costs: {
       shippingCost: number;
       insuranceCost: number;
@@ -67,6 +69,7 @@ interface CheckoutData {
     countryCode: string;
     phone?: string;
   };
+  clientSecret?: string;
 }
 
 export default function CheckoutPage() {
@@ -105,43 +108,19 @@ export default function CheckoutPage() {
     }
   };
 
-  const handlePayment = async () => {
-    try {
-      setProcessing(true);
-      setError(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-      // Create payment intent
-      const response = await fetch(`/api/customer/shipments/${shipmentId}/checkout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+  const handlePaymentSuccess = (paymentIntentId: string) => {
+    setSuccess('Payment completed successfully!');
+    // Redirect after a brief success message
+    setTimeout(() => {
+      router.push(`/dashboard/shipments/${shipmentId}?payment=success&pi=${paymentIntentId}`);
+    }, 2000);
+  };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create payment session');
-      }
-
-      const data = await response.json();
-      
-      // TODO: Integrate with Stripe Elements here
-      // For now, we'll simulate payment processing
-      console.log('Payment Intent:', data);
-      
-      // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // TODO: Handle actual Stripe payment completion
-      // For now, redirect to success page
-      router.push(`/dashboard/shipments/${shipmentId}?payment=success`);
-      
-    } catch (error) {
-      console.error('Error processing payment:', error);
-      setError(error instanceof Error ? error.message : 'Payment failed');
-    } finally {
-      setProcessing(false);
-    }
+  const handlePaymentError = (error: string) => {
+    setError(error);
+    setProcessing(false);
   };
 
   if (loading) {
@@ -342,46 +321,43 @@ export default function CheckoutPage() {
             </CardContent>
           </Card>
 
-          {/* Payment Button */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Payment
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                onClick={handlePayment}
-                disabled={processing || isQuoteExpired}
-                className="w-full"
-                size="lg"
-              >
-                {processing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Pay {shipment.costs.currency} {shipment.costs.totalCost}
-                  </>
-                )}
-              </Button>
-              
-              {error && (
-                <Alert variant="destructive" className="mt-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              
-              <p className="text-xs text-muted-foreground mt-3 text-center">
-                Secure payment powered by Stripe
-              </p>
-            </CardContent>
-          </Card>
+          {/* Payment Form */}
+          {!isQuoteExpired && !success && checkoutData.clientSecret && shipment.canPay && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Payment
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StripePaymentForm
+                  clientSecret={checkoutData.clientSecret}
+                  amount={Math.round(shipment.costs.totalCost * 100)}
+                  currency={shipment.costs.currency}
+                  shipmentId={shipmentId}
+                  onSuccess={handlePaymentSuccess}
+                  onError={handlePaymentError}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {success && (
+            <Alert className="mb-6">
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>
+                {success}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </div>
     </div>

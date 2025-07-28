@@ -213,7 +213,7 @@ export default function ShippingCalculatorPage() {
             <div className="flex items-center">
               <Link href="/" className="flex items-center">
                 <Package className="h-8 w-8 text-orange-500" />
-                <span className="ml-2 text-xl font-bold text-gray-900">ShipForward</span>
+                <span className="ml-2 text-xl font-bold text-gray-900">UKtoEast</span>
               </Link>
             </div>
             <div className="flex items-center space-x-4">

@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Package, Users, Truck, FileText, Settings, Shield, Activity, Menu, Home, MapPin, Warehouse, CreditCard, AlertTriangle, BarChart3, Bell, LogOut, User, ChevronDown, Building2, UserCheck, PackageSearch, TruckIcon, Scan, UserCog, PackageOpen, PackagePlus, ScanLine, Globe } from 'lucide-react';
+import { Package, Users, Truck, FileText, Settings, Shield, Activity, Menu, Home, MapPin, Warehouse, CreditCard, AlertTriangle, BarChart3, Bell, LogOut, User, ChevronDown, Building2, UserCheck, PackageSearch, TruckIcon, Scan, UserCog, PackageOpen, PackagePlus, ScanLine, Globe, ShoppingCart } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import useSWR from 'swr';
@@ -40,6 +40,13 @@ const adminNavItems: AdminNavItem[] = [
     icon: BarChart3,
     label: 'Analytics',
     description: 'Performance metrics',
+    section: 'Overview'
+  },
+  {
+    href: '/admin/personal-shopping',
+    icon: ShoppingCart,
+    label: 'Personal Shopping',
+    description: 'Personal shopping requests',
     section: 'Overview'
   },
 
@@ -219,7 +226,7 @@ function AdminSidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (open
   };
 
   return (
-    <aside className={`w-64 bg-white border-r border-gray-200 lg:block ${
+    <aside className={`w-[330px] bg-white border-r border-gray-200 lg:block ${
       isOpen ? 'block' : 'hidden'
     } lg:relative absolute inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
       isOpen ? 'translate-x-0' : '-translate-x-full'

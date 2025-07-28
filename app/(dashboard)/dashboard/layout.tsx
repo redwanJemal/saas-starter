@@ -14,7 +14,8 @@ import {
   Home,
   MapPin,
   FileText,
-  Truck
+  Truck,
+  ShoppingCart
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -37,6 +38,12 @@ export default function DashboardLayout({
       icon: Package, 
       label: 'Packages',
       description: 'Your received packages'
+    },
+    { 
+      href: '/dashboard/personal-shopping', 
+      icon: ShoppingCart, 
+      label: 'Personal Shopping',
+      description: 'Your personal shopping requests'
     },
     { 
       href: '/dashboard/shipments', 

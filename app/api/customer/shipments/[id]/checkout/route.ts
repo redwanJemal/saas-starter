@@ -330,7 +330,60 @@ export async function GET(
       billingAddress: billingAddress || shippingAddress, // Use shipping address as fallback
     };
 
-    return NextResponse.json(checkoutData);
+    // Create payment intent for Stripe Elements if shipment is ready for payment
+  let clientSecret = null;
+  if (shipment.status === 'quoted' && 
+      (!shipment.quoteExpiresAt || new Date() <= new Date(shipment.quoteExpiresAt))) {
+    
+    // Calculate current storage fees (they may have changed since quote)
+    const packageQuery = await db
+      .select({
+        id: packages.id,
+        warehouseId: packages.warehouseId,
+        receivedAt: packages.receivedAt,
+        weightActualKg: packages.weightActualKg
+      })
+      .from(shipmentPackages)
+      .innerJoin(packages, eq(shipmentPackages.packageId, packages.id))
+      .where(eq(shipmentPackages.shipmentId, shipmentId));
+
+    const currentStorageFees = await StorageFeeCalculator.calculateStorageFees({
+      packages: packageQuery,
+      tenantId: userWithProfile.customerProfile.tenantId
+    });
+
+    const totalAmount = parseFloat(shipment.totalCost || '0') + 
+                       (currentStorageFees.totalStorageFee - parseFloat(shipment.storageFee || '0'));
+
+    // Create payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(totalAmount * 100), // Convert to cents
+      currency: shipment.costCurrency?.toLowerCase() || 'usd',
+      metadata: {
+        shipmentId: shipment.id,
+        customerProfileId: userWithProfile.customerProfile.id,
+        tenantId: userWithProfile.customerProfile.tenantId
+      },
+      automatic_payment_methods: {
+        enabled: true
+      },
+      description: `Shipping for ${shipment.shipmentNumber}`,
+      receipt_email: userWithProfile.email
+    });
+
+    clientSecret = paymentIntent.client_secret;
+  }
+
+  // Add clientSecret and canPay to the response
+  return NextResponse.json({
+    ...checkoutData,
+    clientSecret,
+    shipment: {
+      ...checkoutData.shipment,
+      canPay: shipment.status === 'quoted' && 
+              (!shipment.quoteExpiresAt || new Date() <= new Date(shipment.quoteExpiresAt))
+    }
+  });
 
   } catch (error) {
     console.error('Error fetching checkout data:', error);

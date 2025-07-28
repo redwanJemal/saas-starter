@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import { Manrope } from 'next/font/google';
 import { SWRConfig } from 'swr';
+import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
   title: 'Package Forwarding Platform',
@@ -30,6 +31,7 @@ export default function RootLayout({
           errorRetryInterval: 1000,
           revalidateOnFocus: false,
         }}>
+          <Toaster position="top-right" richColors />
           {children}
         </SWRConfig>
       </body>
