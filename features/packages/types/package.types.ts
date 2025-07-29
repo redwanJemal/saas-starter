@@ -2,31 +2,26 @@ export interface Package {
   id: string;
   trackingNumber: string;
   customerId: string;
-  customerName: string;
-  status: 'received' | 'processing' | 'ready_to_ship' | 'shipped' | 'delivered';
-  weight?: number;
-  dimensions?: {
-    length: number;
-    width: number;
-    height: number;
-  };
-  description?: string;
-  value?: number;
-  receivedAt: string;
-  shippedAt?: string;
-  deliveredAt?: string;
-  photos?: string[];
-  notes?: string;
+  customerName?: string; // Computed field from join
+  status: PackageStatus;
+  weight: string | null;
+  dimensions: string | null;
+  origin: string | null;
+  destination: string;
+  estimatedDelivery: string | null;
   createdAt: string;
   updatedAt: string;
+  photos?: PackagePhoto[]; // Optional relation
 }
 
 export interface PackageFilters {
   status?: string;
   customerId?: string;
   search?: string;
-  dateFrom?: string;
-  dateTo?: string;
+  origin?: string;
+  destination?: string;
+  fromDate?: string;
+  toDate?: string;
   page?: number;
   limit?: number;
 }
@@ -34,26 +29,31 @@ export interface PackageFilters {
 export interface CreatePackageData {
   trackingNumber: string;
   customerId: string;
-  description?: string;
-  weight?: number;
-  dimensions?: {
-    length: number;
-    width: number;
-    height: number;
-  };
-  value?: number;
-  notes?: string;
+  status?: PackageStatus;
+  weight?: string | null;
+  dimensions?: string | null;
+  origin?: string | null;
+  destination: string;
+  estimatedDelivery?: string | null;
 }
 
 export interface UpdatePackageData {
-  description?: string;
-  weight?: number;
-  dimensions?: {
-    length: number;
-    width: number;
-    height: number;
-  };
-  value?: number;
-  notes?: string;
-  status?: string;
+  trackingNumber?: string;
+  customerId?: string;
+  status?: PackageStatus;
+  weight?: string | null;
+  dimensions?: string | null;
+  origin?: string | null;
+  destination?: string;
+  estimatedDelivery?: string | null;
 }
+
+export interface PackagePhoto {
+  id: string;
+  packageId: string;
+  url: string;
+  caption: string | null;
+  createdAt: string;
+}
+
+export type PackageStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'returned';

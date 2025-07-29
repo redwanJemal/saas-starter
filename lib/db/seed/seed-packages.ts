@@ -1,7 +1,7 @@
 import { db } from '../index';
-import { packages, type PackageStatus } from '@/features/packages/schema/package.schema';
-import type { Customer } from '@/features/customers/schema/customer.schema';
-import type { NewPackage } from '@/features/packages/schema/package.schema';
+import { packages, type PackageStatus } from '@/features/packages/db/schema/package.schema';
+import type { Customer } from '@/features/customers/db/schema/customer.schema';
+import type { NewPackage } from '@/features/packages/db/schema/package.schema';
 
 export async function seedPackages(customers: Customer[]) {
   console.log('📦 Seeding packages...');

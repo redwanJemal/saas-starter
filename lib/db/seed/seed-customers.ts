@@ -1,6 +1,6 @@
 import { db } from '../index';
-import { customers, type CustomerStatus } from '@/features/customers/schema/customer.schema';
-import type { NewCustomer } from '@/features/customers/schema/customer.schema';
+import { customers, type CustomerStatus } from '@/features/customers/db/schema/customer.schema';
+import type { NewCustomer } from '@/features/customers/db/schema/customer.schema';
 
 export async function seedCustomers() {
   console.log('👥 Seeding customers...');

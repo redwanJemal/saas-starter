@@ -31,12 +31,12 @@ export function CustomerTable({
   // Table configuration
   const columns = useMemo<ColumnDef<Customer>[]>(() => [
     {
-      accessorKey: 'firstName',
+      accessorKey: 'name',
       header: 'Name',
       cell: ({ row }) => (
         <div>
           <span className="font-medium">
-            {row.original.firstName} {row.original.lastName}
+            {row.original.name}
           </span>
           <div className="text-sm text-muted-foreground">
             {row.original.email}
@@ -49,9 +49,9 @@ export function CustomerTable({
       header: 'Location',
       cell: ({ row }) => (
         <div>
-          <span>{row.original.address.city}, {row.original.address.state}</span>
+          <span>{row.original.city}, {row.original.state}</span>
           <div className="text-sm text-muted-foreground">
-            {row.original.address.country}
+            {row.original.country}
           </div>
         </div>
       ),
@@ -70,18 +70,12 @@ export function CustomerTable({
         <span className="font-medium">{row.original.packageCount}</span>
       ),
     },
+    // Removed totalSpent column as it's not in our schema
     {
-      accessorKey: 'totalSpent',
-      header: 'Total Spent',
-      cell: ({ row }) => (
-        <span className="font-medium">${row.original.totalSpent.toFixed(2)}</span>
-      ),
-    },
-    {
-      accessorKey: 'joinedAt',
+      accessorKey: 'createdAt',
       header: 'Joined',
       cell: ({ row }) => {
-        return new Date(row.original.joinedAt).toLocaleDateString();
+        return new Date(row.original.createdAt).toLocaleDateString();
       },
     },
     {

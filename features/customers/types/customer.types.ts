@@ -1,21 +1,16 @@
 export interface Customer {
   id: string;
+  name: string;
   email: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  address: {
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-  };
-  status: 'active' | 'inactive' | 'suspended';
-  packageCount: number;
-  totalSpent: number;
-  joinedAt: string;
-  lastActivityAt?: string;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  postalCode: string | null;
+  status: 'active' | 'inactive' | 'pending' | 'blocked';
+  notes: string | null;
+  packageCount?: number; // Computed field
   createdAt: string;
   updatedAt: string;
 }
@@ -31,29 +26,27 @@ export interface CustomerFilters {
 }
 
 export interface CreateCustomerData {
+  name: string;
   email: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  address: {
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-  };
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  postalCode?: string | null;
+  status?: 'active' | 'inactive' | 'pending' | 'blocked';
+  notes?: string | null;
 }
 
 export interface UpdateCustomerData {
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-  address?: {
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-  };
-  status?: string;
+  name?: string;
+  email?: string;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  postalCode?: string | null;
+  status?: 'active' | 'inactive' | 'pending' | 'blocked';
+  notes?: string | null;
 }
