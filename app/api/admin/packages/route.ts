@@ -227,6 +227,10 @@ export async function POST(request: NextRequest) {
     // Generate internal ID
     const internalId = generatePackageInternalId();
 
+    const formattedExpectedArrivalDate = expectedArrivalDate 
+  ? new Date(expectedArrivalDate).toISOString().split('T')[0] // YYYY-MM-DD format
+  : undefined;
+
     // Create package
     const [newPackage] = await db
       .insert(packages)
@@ -247,7 +251,7 @@ export async function POST(request: NextRequest) {
         volumetricWeightKg: volumetricWeightKg ? volumetricWeightKg.toString() : null,
         estimatedValue: estimatedValue ? estimatedValue.toString() : null,
         estimatedValueCurrency,
-        expectedArrivalDate: expectedArrivalDate ? new Date(expectedArrivalDate) : null,
+        expectedArrivalDate: formattedExpectedArrivalDate,
         warehouseNotes,
         customerNotes,
         specialInstructions,

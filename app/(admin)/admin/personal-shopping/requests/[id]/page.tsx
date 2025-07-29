@@ -229,7 +229,7 @@ export default function AdminPersonalShoppingRequestDetail() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="mx-auto p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">

@@ -227,7 +227,7 @@ export default function PackageAssignmentPage() {
   const selectedCustomerObj = customers.find(c => c.id === selectedCustomer);
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="mx-auto p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Package Assignment</h1>
         <p className="text-gray-600">

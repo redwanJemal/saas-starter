@@ -9,7 +9,8 @@ import {
   packages 
 } from '@/lib/db/schema'
 import { eq, sql, inArray } from 'drizzle-orm'
-import { requirePermission } from '@/lib/auth/admin'
+import { requireAdminUser, requirePermission } from '@/lib/auth/admin'
+import { notifyPackageAssigned } from '@/lib/utils/notifications'
 
 // Get unassigned items for assignment interface
 export async function GET(request: NextRequest) {
@@ -91,44 +92,110 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const adminUser = await requirePermission('packages.manage');
+    // Check permission
+    await requirePermission('packages.assign');
+    
+    const adminUser = await requireAdminUser();
     const body = await request.json();
-    const { itemId, status } = body;
+    const { itemIds, customerProfileId } = body;
 
-    if (!itemId || !status) {
+    if (!Array.isArray(itemIds) || itemIds.length === 0) {
       return NextResponse.json(
-        { error: 'Item ID and status are required' },
+        { error: 'Item IDs are required' },
         { status: 400 }
       );
     }
 
-    // Update the assigned item status
-    const [updatedItem] = await db
-      .update(incomingShipmentItems)
-      .set({
-        assignmentStatus: status,
-        updatedAt: new Date()
-      })
-      .where(eq(incomingShipmentItems.id, itemId))
-      .returning();
-
-    if (!updatedItem) {
+    if (!customerProfileId) {
       return NextResponse.json(
-        { error: 'Item not found' },
+        { error: 'Customer profile ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if customer exists
+    const [customer] = await db
+      .select({
+        id: customerProfiles.id,
+        userId: customerProfiles.userId,
+      })
+      .from(customerProfiles)
+      .where(eq(customerProfiles.id, customerProfileId))
+      .limit(1);
+
+    if (!customer) {
+      return NextResponse.json(
+        { error: 'Customer not found' },
         { status: 404 }
       );
     }
 
+    // Check for duplicate tracking numbers to prevent duplicate assignments
+    const existingItems = await db
+      .select({
+        id: incomingShipmentItems.id,
+        trackingNumber: incomingShipmentItems.trackingNumber,
+        assignmentStatus: incomingShipmentItems.assignmentStatus,
+      })
+      .from(incomingShipmentItems)
+      .where(inArray(incomingShipmentItems.id, itemIds));
+
+    const alreadyAssigned = existingItems.filter(item => 
+      item.assignmentStatus === 'assigned' || item.assignmentStatus === 'received'
+    );
+
+    if (alreadyAssigned.length > 0) {
+      return NextResponse.json(
+        { 
+          error: 'Some items are already assigned',
+          duplicateItems: alreadyAssigned.map(item => ({
+            id: item.id,
+            trackingNumber: item.trackingNumber,
+            status: item.assignmentStatus
+          }))
+        },
+        { status: 409 }
+      );
+    }
+
+    // Update items to assigned status
+    const updatedItems = await db
+      .update(incomingShipmentItems)
+      .set({
+        assignmentStatus: 'assigned',
+        assignedCustomerProfileId: customerProfileId,
+        assignedAt: new Date(),
+        assignedBy: adminUser.id,
+      })
+      .where(inArray(incomingShipmentItems.id, itemIds))
+      .returning({
+        id: incomingShipmentItems.id,
+        trackingNumber: incomingShipmentItems.trackingNumber,
+      });
+
+    // Send notifications for each assigned item
+    const notificationPromises = updatedItems.map(item =>
+      notifyPackageAssigned(
+        adminUser.tenantId,
+        customerProfileId,
+        item.trackingNumber?.toString() || '',
+        item.id
+      )
+    );
+
+    await Promise.all(notificationPromises);
+
     return NextResponse.json({
-      success: true,
-      item: updatedItem,
-      message: `Item status updated to ${status}`
+      message: `Successfully assigned ${updatedItems.length} items to ${customer.userId}`,
+      assignedItems: updatedItems,
+      customerName: `${customer.userId}`,
+      notificationsSent: updatedItems.length,
     });
 
   } catch (error) {
-    console.error('Error updating assigned item:', error);
+    console.error('Error assigning packages:', error);
     return NextResponse.json(
-      { error: 'Failed to update assigned item' },
+      { error: 'Failed to assign packages' },
       { status: 500 }
     );
   }
