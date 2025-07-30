@@ -71,6 +71,10 @@ export const customerWarehouseAssignments = pgTable('customer_warehouse_assignme
   suiteCode: varchar('suite_code', { length: 50 }).notNull(),
   status: varchar('status', { length: 20 }).default('active'),
   assignedAt: timestamp('assigned_at').notNull().defaultNow(),
+  expiresAt: timestamp('expires_at'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
   assignedBy: uuid('assigned_by'), // References users.id
 });
 
@@ -128,6 +132,7 @@ export const binLocations = pgTable('bin_locations', {
   
   // Status
   isActive: boolean('is_active').default(true).notNull(),
+  isAvailable: boolean('is_available').default(true).notNull(),
   
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -361,4 +366,205 @@ export interface CreateStorageChargeData {
   dailyRate: string;
   freeDaysApplied?: number;
   notes?: string;
+}
+
+
+export interface CustomerWarehouseAssignmentFilters {
+  page?: number;
+  limit?: number;
+  warehouseId?: string;
+  customerId?: string;
+  status?: AssignmentStatus;
+  search?: string;
+}
+
+// ============================================================================= 
+// CREATE/UPDATE INTERFACES (Additional)
+// =============================================================================
+
+export interface CreateCustomerWarehouseAssignmentData {
+  customerProfileId: string;
+  warehouseId: string;
+  suiteCode: string;
+  status?: AssignmentStatus;
+  assignedAt?: string;
+  expiresAt?: string;
+  notes?: string;
+}
+
+export interface UpdateCustomerWarehouseAssignmentData {
+  status?: AssignmentStatus;
+  assignedAt?: string;
+  expiresAt?: string;
+  notes?: string;
+}
+
+// ============================================================================= 
+// API RESPONSE INTERFACES
+// =============================================================================
+
+export interface WarehouseResponse {
+  id: string;
+  tenantId: string;
+  code: string;
+  name: string;
+  description?: string;
+  countryCode: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  stateProvince?: string;
+  postalCode: string;
+  phone?: string;
+  email?: string;
+  timezone: string;
+  currencyCode: string;
+  taxTreatment: TaxTreatment;
+  storageFreeDays: number;
+  storageFeePerDay: string;
+  maxPackageWeightKg: string;
+  maxPackageValue: string;
+  status: WarehouseStatus;
+  acceptsNewPackages: boolean;
+  operatingHours: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
+  // Optional stats for list view
+  stats?: {
+    totalPackages: number;
+    pendingPackages: number;
+    readyPackages: number;
+    totalShipments: number;
+    activeShipments: number;
+  };
+}
+
+export interface CustomerWarehouseAssignmentResponse {
+  id: string;
+  customerProfileId: string;
+  warehouseId: string;
+  status: AssignmentStatus;
+  assignedAt: Date;
+  expiresAt?: Date;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  // Related data
+  customerId: string;
+  customerFirstName: string;
+  customerLastName: string;
+  customerEmail: string;
+  warehouseCode: string;
+  warehouseName: string;
+  warehouseCity: string;
+  warehouseCountryCode: string;
+}
+
+export interface StoragePricingResponse {
+  id: string;
+  tenantId: string;
+  warehouseId: string;
+  freeDays: number;
+  dailyRateAfterFree: string;
+  currency: string;
+  effectiveFrom: Date;
+  effectiveUntil?: Date;
+  isActive: boolean;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  // Related data
+  warehouseCode: string;
+  warehouseName: string;
+  warehouseCity: string;
+  warehouseCountryCode: string;
+}
+
+export interface BinLocationResponse {
+  id: string;
+  tenantId: string;
+  warehouseId: string;
+  binCode: string;
+  zoneName: string;
+  description?: string;
+  maxCapacity?: number;
+  currentPackageCount: number;
+  maxWeightKg?: string;
+  dailyPremium: string;
+  currency: string;
+  isClimateControlled: boolean;
+  isSecured: boolean;
+  isAccessible: boolean;
+  isActive: boolean;
+  isAvailable: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  // Related data
+  warehouseCode: string;
+  warehouseName: string;
+  warehouseCity: string;
+  // Calculated fields
+  capacityUsagePercent: number;
+  isAtCapacity: boolean;
+  availableCapacity?: number;
+}
+
+export interface PackageBinAssignmentResponse {
+  id: string;
+  packageId: string;
+  binId: string;
+  assignedAt: Date;
+  removedAt?: Date;
+  assignmentReason: string;
+  removalReason?: string;
+  notes?: string;
+  assignedBy: string;
+  removedBy?: string;
+  // Package info
+  packageInternalId: string;
+  packageTrackingNumber: string;
+  packageDescription?: string;
+  packageStatus: string;
+  // Customer info
+  customerId: string;
+  customerFirstName: string;
+  customerLastName: string;
+  // Bin info
+  binCode: string;
+  zoneName: string;
+  warehouseId: string;
+}
+
+export interface StorageChargeResponse {
+  id: string;
+  packageId: string;
+  tenantId: string;
+  chargeFromDate: Date;
+  chargeToDate: Date;
+  daysCharged: number;
+  baseStorageFee: string;
+  binLocationFee?: string;
+  totalStorageFee: string;
+  currency: string;
+  binLocationId?: string;
+  isInvoiced: boolean;
+  invoiceId?: string;
+  dailyRate: string;
+  freeDaysApplied: number;
+  calculatedAt: Date;
+  calculatedBy: string;
+  notes?: string;
+  // Package info
+  packageInternalId: string;
+  packageTrackingNumber: string;
+  packageDescription?: string;
+  packageStatus: string;
+  // Customer info
+  customerId: string;
+  customerFirstName: string;
+  customerLastName: string;
+  customerEmail: string;
+  // Bin info (optional)
+  binCode?: string;
+  zoneName?: string;
 }
