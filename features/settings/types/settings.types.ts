@@ -80,13 +80,13 @@ import type {
     courierId: string;
     isActive?: boolean;
     contractDetails?: Record<string, any>;
-    apiCredentials?: Record<string, any>;
+    apiCredentials?: string;
   }
   
   export interface UpdateTenantCourierData {
     isActive?: boolean;
     contractDetails?: Record<string, any>;
-    apiCredentials?: Record<string, any>;
+    apiCredentials?: string;
   }
   
   // Statistics and aggregation types
