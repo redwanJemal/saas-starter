@@ -46,6 +46,6 @@ export { calculateStorageCharges } from './storage/calculate-storage-charges.que
 export { getUnbilledStorageCharges } from './storage/get-unbilled-storage-charges.query';
 export { markStorageChargesInvoiced } from './storage/mark-storage-charges-invoiced.query';
 
-// // Utility queries
-// export { getWarehouseStatistics } from './utils/get-warehouse-statistics.query';
-// export { getWarehouseCapacity } from './utils/get-warehouse-capacity.query';
+// Utility queries
+export { getWarehouseStatistics } from './utils/get-warehouse-statistics.query';
+export { getWarehouseCapacity } from './utils/get-warehouse-capacity.query';
