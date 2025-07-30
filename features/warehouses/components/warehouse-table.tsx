@@ -180,9 +180,7 @@ export function WarehouseTable({
       </div>
 
       {/* Data Table */}
-      <Card>
-        <CardContent className="p-0">
-          <DataTable
+      <DataTable
             columns={columns}
             data={warehouses}
             isLoading={isLoading}
@@ -190,8 +188,6 @@ export function WarehouseTable({
             pagination={response?.pagination}
             searchPlaceholder="Search warehouses by name, code, or location..."
           />
-        </CardContent>
-      </Card>
     </div>
   );
 }
