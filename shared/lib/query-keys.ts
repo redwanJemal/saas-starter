@@ -19,6 +19,44 @@ export const queryKeys = {
     search: (query: string) => [...queryKeys.customers.all, 'search', query] as const,
   },
 
+  // Warehouses
+  warehouses: {
+    all: ['warehouses'] as const,
+    lists: () => [...queryKeys.warehouses.all, 'list'] as const,
+    list: (filters: any) => [...queryKeys.warehouses.lists(), { filters }] as const,
+    details: () => [...queryKeys.warehouses.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.warehouses.details(), id] as const,
+    statistics: () => [...queryKeys.warehouses.all, 'statistics'] as const,
+    capacity: (id: string) => [...queryKeys.warehouses.all, 'capacity', id] as const,
+    
+    // Bin Locations
+    binLocations: {
+      all: ['binLocations'] as const,
+      lists: () => [...queryKeys.warehouses.binLocations.all, 'list'] as const,
+      list: (filters: any) => [...queryKeys.warehouses.binLocations.lists(), { filters }] as const,
+      details: () => [...queryKeys.warehouses.binLocations.all, 'detail'] as const,
+      detail: (id: string) => [...queryKeys.warehouses.binLocations.details(), id] as const,
+    },
+    
+    // Customer Warehouse Assignments
+    assignments: {
+      all: ['assignments'] as const,
+      lists: () => [...queryKeys.warehouses.assignments.all, 'list'] as const,
+      list: (filters: any) => [...queryKeys.warehouses.assignments.lists(), { filters }] as const,
+      details: () => [...queryKeys.warehouses.assignments.all, 'detail'] as const,
+      detail: (id: string) => [...queryKeys.warehouses.assignments.details(), id] as const,
+    },
+    
+    // Storage Pricing
+    storagePricing: {
+      all: ['storagePricing'] as const,
+      lists: () => [...queryKeys.warehouses.storagePricing.all, 'list'] as const,
+      list: (filters: any) => [...queryKeys.warehouses.storagePricing.lists(), { filters }] as const,
+      details: () => [...queryKeys.warehouses.storagePricing.all, 'detail'] as const,
+      detail: (id: string) => [...queryKeys.warehouses.storagePricing.details(), id] as const,
+    },
+  },
+
   // Dashboard
   dashboard: {
     all: ['dashboard'] as const,
