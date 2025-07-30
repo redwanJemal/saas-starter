@@ -145,7 +145,7 @@ export default function CouriersPage() {
 
   if (!couriers.length && !isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -196,7 +196,7 @@ export default function CouriersPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -267,9 +267,7 @@ export default function CouriersPage() {
       </div>
 
       {/* Data Table */}
-      <Card>
-        <CardContent className="p-0">
-          <DataTable
+      <DataTable
             columns={columns}
             data={couriers}
             isLoading={isLoading}
@@ -277,8 +275,6 @@ export default function CouriersPage() {
             pagination={response?.pagination}
             searchPlaceholder="Search couriers by name or code..."
           />
-        </CardContent>
-      </Card>
     </div>
   );
 }

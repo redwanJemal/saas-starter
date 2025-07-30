@@ -135,7 +135,7 @@ export default function CountriesPage() {
 
   if (!countries.length && !isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -186,7 +186,7 @@ export default function CountriesPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -254,9 +254,7 @@ export default function CountriesPage() {
       </div>
 
       {/* Data Table */}
-      <Card>
-        <CardContent className="p-0">
-          <DataTable
+      <DataTable
             columns={columns}
             data={countries}
             isLoading={isLoading}
@@ -264,8 +262,6 @@ export default function CountriesPage() {
             pagination={response?.pagination}
             searchPlaceholder="Search countries by name or code..."
           />
-        </CardContent>
-      </Card>
     </div>
   );
 }

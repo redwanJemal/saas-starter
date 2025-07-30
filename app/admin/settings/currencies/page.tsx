@@ -139,7 +139,7 @@ export default function CurrenciesPage() {
 
   if (!currencies.length && !isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -190,7 +190,7 @@ export default function CurrenciesPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -258,9 +258,7 @@ export default function CurrenciesPage() {
       </div>
 
       {/* Data Table */}
-      <Card>
-        <CardContent className="p-0">
-          <DataTable
+      <DataTable
             columns={columns}
             data={currencies}
             isLoading={isLoading}
@@ -268,8 +266,6 @@ export default function CurrenciesPage() {
             pagination={response?.pagination}
             searchPlaceholder="Search currencies by name or code..."
           />
-        </CardContent>
-      </Card>
     </div>
   );
 }
