@@ -9,7 +9,7 @@ import type {
   CreateCustomerWarehouseAssignmentData,
   CustomerWarehouseAssignmentResponse 
 } from '@/features/warehouses/db/schema';
-import { PaginatedResponse } from '@/lib/utils';
+import { PaginatedResponse } from '@/shared/types/api.types';
 
 // GET /api/admin/warehouses/assignments - List customer warehouse assignments
 export async function GET(request: NextRequest) {

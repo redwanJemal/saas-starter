@@ -8,7 +8,7 @@ import type {
   CreatePackageBinAssignmentData,
   PackageBinAssignmentResponse 
 } from '@/features/warehouses/db/schema';
-import { PaginatedResponse } from '@/lib/utils';
+import { PaginatedResponse } from '@/shared/types/api.types';
 
 interface PackageBinAssignmentFilters {
   page?: number;

@@ -9,7 +9,8 @@ import type {
   CreateBinLocationData,
   BinLocationResponse 
 } from '@/features/warehouses/db/schema';
-import { PaginatedResponse } from '@/lib/utils';
+
+import { PaginatedResponse } from '@/shared/types/api.types';
 
 // GET /api/admin/warehouses/bins - List bin locations
 export async function GET(request: NextRequest) {

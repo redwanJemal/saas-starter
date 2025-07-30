@@ -9,7 +9,8 @@ import type {
   CreateStoragePricingData,
   StoragePricingResponse 
 } from '@/features/warehouses/db/schema';
-import { PaginatedResponse } from '@/lib/utils';
+
+import { PaginatedResponse } from '@/shared/types/api.types';
 
 // GET /api/admin/warehouses/storage-pricing - List storage pricing
 export async function GET(request: NextRequest) {
