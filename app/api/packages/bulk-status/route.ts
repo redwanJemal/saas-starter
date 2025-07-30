@@ -37,7 +37,7 @@ export async function PATCH(request: NextRequest) {
     if (!result.success) {
       return NextResponse.json(
         { success: false, message: result.message },
-        { status: result.status }
+        { status: 500 }
       );
     }
 

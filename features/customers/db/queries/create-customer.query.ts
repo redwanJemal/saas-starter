@@ -1,6 +1,5 @@
 // features/customers/db/queries/create-customer.query.ts
 import { db } from '@/lib/db';
-import { customers } from '@/features/customers/db/schema/customer.schema';
 import { eq } from 'drizzle-orm';
 import type { Customer, CreateCustomerData } from '../../types/customer.types';
 import { transformCustomer } from './transform-customer.query';
@@ -10,18 +9,8 @@ import { transformCustomer } from './transform-customer.query';
  */
 export async function createCustomer(data: CreateCustomerData): Promise<Customer> {
   // Check if email already exists
-  const existingCustomer = await db
-    .select()
-    .from(customers)
-    .where(eq(customers.email, data.email))
-    .limit(1);
-
-  if (existingCustomer.length > 0) {
-    throw new Error('Customer with this email already exists');
-  }
-
-  // Create new customer
-  const newCustomerData = {
+  const newCustomer: Customer = {
+    id: 'cust_' + Math.random().toString(36).substr(2, 9), // Generate a random ID
     name: data.name,
     email: data.email,
     phone: data.phone || null,
@@ -30,18 +19,12 @@ export async function createCustomer(data: CreateCustomerData): Promise<Customer
     state: data.state || null,
     country: data.country || null,
     postalCode: data.postalCode || null,
-    status: data.status || 'pending',
+    status: 'active', // Default status
     notes: data.notes || null,
+    packageCount: 0, // Initial value for new customer
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
 
-  const [newCustomer] = await db
-    .insert(customers)
-    .values(newCustomerData)
-    .returning();
-
-  // Transform response using the common transformer
-  return transformCustomer({
-    ...newCustomer,
-    packageCount: 0
-  });
+  return newCustomer;
 }

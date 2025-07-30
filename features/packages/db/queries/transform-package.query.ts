@@ -1,13 +1,12 @@
 // features/packages/db/queries/transform-package.query.ts
 import type { Package } from '../../types/package.types';
-import type { Package as DbPackage } from '../schema/package.schema';
 
 /**
  * Transform a database package record into the expected API format
  * with customer name included
  */
 export function transformPackageWithCustomerName(
-  packageData: DbPackage,
+  packageData: any,
   customerName: string
 ): Package {
   return {
@@ -29,7 +28,7 @@ export function transformPackageWithCustomerName(
 /**
  * Transform a database package record into the expected API format
  */
-export function transformPackage(packageData: DbPackage): Package {
+export function transformPackage(packageData: any): Package {
   return {
     id: packageData.id,
     trackingNumber: packageData.trackingNumber,
