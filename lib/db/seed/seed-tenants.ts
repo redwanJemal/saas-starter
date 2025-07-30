@@ -8,10 +8,10 @@ export async function seedTenants() {
 
   const tenantData = [
     {
-      name: 'Package Forward Pro',
+      name: 'UkToEast',
       slug: 'package-forward-pro',
       domain: 'packageforwardpro.com',
-      companyName: 'Package Forward Pro Inc.',
+      companyName: 'UkToEast Inc.',
       companyRegistration: 'REG-001-2024',
       taxNumber: 'TAX-PFP-001',
       planType: 'enterprise',
@@ -38,72 +38,6 @@ export async function seedTenants() {
         primaryColor: '#2563eb',
         logo: '/logos/package-forward-pro.png',
         favicon: '/favicons/package-forward-pro.ico'
-      }
-    },
-    {
-      name: 'Global Ship Express',
-      slug: 'global-ship-express',
-      domain: 'globalshipexpress.com',
-      companyName: 'Global Ship Express LLC',
-      companyRegistration: 'REG-002-2024',
-      taxNumber: 'TAX-GSE-002',
-      planType: 'professional',
-      billingEmail: 'billing@globalshipexpress.com',
-      status: 'active' as const,
-      maxUsers: 500,
-      maxPackagesMonthly: 25000,
-      settings: {
-        timezone: 'America/Los_Angeles',
-        currency: 'USD',
-        notifications: {
-          email: true,
-          sms: false,
-          push: true
-        },
-        features: {
-          personalShopper: false,
-          consolidation: true,
-          insurance: true,
-          storage: false
-        }
-      },
-      branding: {
-        primaryColor: '#059669',
-        logo: '/logos/global-ship-express.png',
-        favicon: '/favicons/global-ship-express.ico'
-      }
-    },
-    {
-      name: 'QuickForward',
-      slug: 'quickforward',
-      domain: 'quickforward.net',
-      companyName: 'QuickForward Services Corp',
-      companyRegistration: 'REG-003-2024',
-      taxNumber: 'TAX-QF-003',
-      planType: 'standard',
-      billingEmail: 'billing@quickforward.net',
-      status: 'active' as const,
-      maxUsers: 100,
-      maxPackagesMonthly: 10000,
-      settings: {
-        timezone: 'America/Chicago',
-        currency: 'USD',
-        notifications: {
-          email: true,
-          sms: false,
-          push: false
-        },
-        features: {
-          personalShopper: false,
-          consolidation: false,
-          insurance: false,
-          storage: true
-        }
-      },
-      branding: {
-        primaryColor: '#dc2626',
-        logo: '/logos/quickforward.png',
-        favicon: '/favicons/quickforward.ico'
       }
     }
   ];
