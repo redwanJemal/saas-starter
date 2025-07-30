@@ -432,8 +432,6 @@ export function BinLocationsTab({ warehouseId }: BinLocationsTabProps) {
       </Card>
 
       {/* Bin Locations Table */}
-      <Card>
-        <CardContent className="p-0">
           <DataTable
             columns={columns}
             data={binLocations}
@@ -442,8 +440,6 @@ export function BinLocationsTab({ warehouseId }: BinLocationsTabProps) {
             pagination={response?.pagination}
             searchPlaceholder="Search bin locations..."
           />
-        </CardContent>
-      </Card>
     </div>
   );
 }

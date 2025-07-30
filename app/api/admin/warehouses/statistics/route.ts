@@ -50,10 +50,26 @@ export async function GET(request: NextRequest) {
         : 0,
     };
 
-    return NextResponse.json({
-      warehouses: validStatistics,
-      aggregate: aggregateStats,
-    });
+    // Create the response with the correct structure and types
+    const responseData = {
+      data: {
+        warehouses: validStatistics,
+        aggregate: {
+          ...aggregateStats,
+          // Add missing properties expected by the frontend
+          activeWarehouses: validStatistics.filter(stats => stats && typeof stats === 'object' && 'status' in stats && stats.status === 'active').length,
+          totalCapacity: validStatistics.reduce((sum, stats) => {
+            const capacity = stats && typeof stats === 'object' && 'totalBinCapacity' in stats ? 
+              parseFloat(String(stats.totalBinCapacity || '0')) : 0;
+            return sum + capacity;
+          }, 0),
+          averageUtilization: aggregateStats.averageCapacityUtilization
+        }
+      },
+      success: true
+    };
+    
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Error fetching warehouse statistics:', error);
     return NextResponse.json(
