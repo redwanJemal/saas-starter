@@ -415,7 +415,6 @@ export default function ShippingRatesPage() {
           <DataTable
             columns={columns}
             data={filteredRates}
-            searchKey="warehouse.name"
             searchPlaceholder="Search by warehouse or zone..."
             isLoading={loading}
             loadingMessage="Loading shipping rates..."
