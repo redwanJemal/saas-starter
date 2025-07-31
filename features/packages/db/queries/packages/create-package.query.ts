@@ -13,52 +13,65 @@ export interface CreatePackageData {
   // Customer reference
   customerProfileId: string;
   
+  // Warehouse assignment
+  warehouseId?: string;
+  
+  // Pre-receiving workflow
+  incomingShipmentItemId?: string;
+  
   // Package identification
   internalId?: string;
   trackingNumberInbound?: string;
   trackingNumberOutbound?: string;
+  suiteCodeCaptured?: string;
   
-  // Package details
-  description?: string;
+  // Sender information
+  senderName?: string;
+  senderCompany?: string;
+  senderAddress?: string;
+  senderCity?: string;
+  senderCountryCode?: string;
+  senderPostalCode?: string;
+  senderPhone?: string;
+  senderEmail?: string;
+  senderTrackingUrl?: string;
   
-  // Physical characteristics
-  weightKg?: number;
+  // Physical properties
+  weightActualKg?: number;
   lengthCm?: number;
   widthCm?: number;
   heightCm?: number;
   volumetricWeightKg?: number;
   chargeableWeightKg?: number;
   
-  // Status and dates
-  status?: PackageStatus;
-  expectedArrivalDate?: string | Date | null;
-  receivedAt?: string | Date | null;
-  readyToShipAt?: string | Date | null;
-  storageExpiresAt?: string | Date | null;
-  
-  // Warehouse assignment
-  warehouseId?: string;
-  
-  // Notes and instructions
+  // Content and handling
+  description?: string;
   warehouseNotes?: string;
   customerNotes?: string;
   specialInstructions?: string;
   
-  // Package characteristics
+  // Flags
   isFragile?: boolean;
   isHighValue?: boolean;
   requiresAdultSignature?: boolean;
   isRestricted?: boolean;
   
+  // Status and dates
+  status?: PackageStatus;
+  statusNotes?: string;
+  expectedArrivalDate?: string | Date | null;
+  receivedAt?: string | Date | null;
+  readyToShipAt?: string | Date | null;
+  storageExpiresAt?: string | Date | null;
+  
   // Customs information
   customsDeclaration?: string;
   customsValue?: number;
   customsValueCurrency?: string;
+  estimatedValue?: number;
+  estimatedValueCurrency?: string;
   countryOfOrigin?: string;
   hsCode?: string;
-  
-  // Pre-receiving workflow
-  incomingShipmentItemId?: string;
   
   // Processing info
   processedBy?: string;
@@ -83,16 +96,31 @@ export async function createPackage(
         // Customer reference
         customerProfileId: data.customerProfileId,
         
+        // Warehouse assignment
+        warehouseId: data.warehouseId,
+        
+        // Pre-receiving workflow
+        incomingShipmentItemId: data.incomingShipmentItemId,
+        
         // Package identification
         internalId,
         trackingNumberInbound: data.trackingNumberInbound,
         trackingNumberOutbound: data.trackingNumberOutbound,
+        suiteCodeCaptured: data.suiteCodeCaptured,
         
-        // Package details
-        description: data.description,
+        // Sender information
+        senderName: data.senderName,
+        senderCompany: data.senderCompany,
+        senderAddress: data.senderAddress,
+        senderCity: data.senderCity,
+        senderCountryCode: data.senderCountryCode,
+        senderPostalCode: data.senderPostalCode,
+        senderPhone: data.senderPhone,
+        senderEmail: data.senderEmail,
+        senderTrackingUrl: data.senderTrackingUrl,
         
-        // Physical characteristics
-        weightKg: data.weightKg,
+        // Physical properties
+        weightActualKg: data.weightActualKg,
         lengthCm: data.lengthCm,
         widthCm: data.widthCm,
         heightCm: data.heightCm,
@@ -102,7 +130,7 @@ export async function createPackage(
           data.heightCm
         ),
         chargeableWeightKg: data.chargeableWeightKg || calculateChargeableWeight(
-          data.weightKg,
+          data.weightActualKg,
           data.volumetricWeightKg || calculateVolumetricWeight(
             data.lengthCm, 
             data.widthCm, 
@@ -110,36 +138,34 @@ export async function createPackage(
           )
         ),
         
-        // Status and dates
-        status,
-        expectedArrivalDate: data.expectedArrivalDate ? new Date(data.expectedArrivalDate) : null,
-        receivedAt: data.receivedAt ? new Date(data.receivedAt) : null,
-        readyToShipAt: data.readyToShipAt ? new Date(data.readyToShipAt) : null,
-        storageExpiresAt: data.storageExpiresAt ? new Date(data.storageExpiresAt) : null,
-        
-        // Warehouse assignment
-        warehouseId: data.warehouseId,
-        
-        // Notes and instructions
+        // Content and handling
+        description: data.description,
         warehouseNotes: data.warehouseNotes,
         customerNotes: data.customerNotes,
         specialInstructions: data.specialInstructions,
         
-        // Package characteristics
+        // Flags
         isFragile: data.isFragile || false,
         isHighValue: data.isHighValue || false,
         requiresAdultSignature: data.requiresAdultSignature || false,
         isRestricted: data.isRestricted || false,
         
+        // Status and dates
+        status,
+        statusNotes: data.statusNotes,
+        expectedArrivalDate: data.expectedArrivalDate ? new Date(data.expectedArrivalDate) : null,
+        receivedAt: data.receivedAt ? new Date(data.receivedAt) : null,
+        readyToShipAt: data.readyToShipAt ? new Date(data.readyToShipAt) : null,
+        storageExpiresAt: data.storageExpiresAt ? new Date(data.storageExpiresAt) : null,
+        
         // Customs information
         customsDeclaration: data.customsDeclaration,
         customsValue: data.customsValue,
         customsValueCurrency: data.customsValueCurrency,
+        estimatedValue: data.estimatedValue,
+        estimatedValueCurrency: data.estimatedValueCurrency,
         countryOfOrigin: data.countryOfOrigin,
         hsCode: data.hsCode,
-        
-        // Pre-receiving workflow
-        incomingShipmentItemId: data.incomingShipmentItemId,
         
         // Processing info
         processedBy: data.processedBy || createdBy,

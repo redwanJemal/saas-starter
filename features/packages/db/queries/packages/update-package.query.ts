@@ -128,10 +128,10 @@ export async function updatePackage(
     // Status and dates
     if (data.status !== undefined) updateData.status = data.status;
     if (data.expectedArrivalDate !== undefined) {
-      updateData.expectedArrivalDate = data.expectedArrivalDate ? new Date(data.expectedArrivalDate) : null;
+      updateData.expectedArrivalDate = data.expectedArrivalDate ? String(data.expectedArrivalDate) : null;
     }
     if (data.receivedAt !== undefined) {
-      updateData.receivedAt = data.receivedAt ? new Date(data.receivedAt) : null;
+      updateData.receivedAt = data.receivedAt ? String(data.receivedAt) : null;
     }
     if (data.readyToShipAt !== undefined) {
       updateData.readyToShipAt = data.readyToShipAt ? new Date(data.readyToShipAt) : null;

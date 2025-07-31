@@ -2,16 +2,14 @@
 import { db } from '@/lib/db';
 import { 
   incomingShipments, 
-  incomingShipmentItems, 
-  packages,
-  IncomingShipmentFilters 
+  incomingShipmentItems
 } from '@/features/packages/db/schema';
 import { warehouses } from '@/features/warehouses/db/schema';
-import { couriers } from '@/features/settings/db/schema';
-import { customerProfiles } from '@/features/customers/db/schema';
-import { users } from '@/features/auth/db/schema';
-import { eq, desc, and, or, ilike, count, sql } from 'drizzle-orm';
-import type { IncomingShipmentWithItems } from '@/features/packages/types/package.types';
+import { eq, desc, and, or, ilike, count, sql, inArray } from 'drizzle-orm';
+import type { 
+  IncomingShipmentWithItems,
+  IncomingShipmentFilters 
+} from '@/features/packages/types/package.types';
 
 export async function getIncomingShipments(
   tenantId: string,
@@ -29,7 +27,6 @@ export async function getIncomingShipments(
   const {
     status,
     warehouseId,
-    courierId,
     courierName,
     batchReference,
     fromDate,
@@ -41,12 +38,12 @@ export async function getIncomingShipments(
 
   const offset = (page - 1) * limit;
 
-  // Build where conditions
+  // Build where conditions for shipments
   const whereConditions = [eq(incomingShipments.tenantId, tenantId)];
 
   if (status) {
     if (Array.isArray(status)) {
-      whereConditions.push(or(...status.map(s => eq(incomingShipments.status, s))));
+      whereConditions.push(inArray(incomingShipments.status, status));
     } else {
       whereConditions.push(eq(incomingShipments.status, status));
     }
@@ -54,10 +51,6 @@ export async function getIncomingShipments(
 
   if (warehouseId) {
     whereConditions.push(eq(incomingShipments.warehouseId, warehouseId));
-  }
-
-  if (courierId) {
-    whereConditions.push(eq(incomingShipments.courierId, courierId));
   }
 
   if (courierName) {
@@ -69,185 +62,147 @@ export async function getIncomingShipments(
   }
 
   if (fromDate) {
-    whereConditions.push(sql`${incomingShipments.expectedArrivalDate} >= ${fromDate}`);
+    whereConditions.push(sql`${incomingShipments.arrivalDate} >= ${fromDate}::date`);
   }
 
   if (toDate) {
-    whereConditions.push(sql`${incomingShipments.expectedArrivalDate} <= ${toDate}`);
+    whereConditions.push(sql`${incomingShipments.arrivalDate} <= ${toDate}::date`);
   }
 
   if (search) {
     whereConditions.push(
       or(
         ilike(incomingShipments.batchReference, `%${search}%`),
-        ilike(incomingShipments.trackingNumber, `%${search}%`),
         ilike(incomingShipments.courierName, `%${search}%`),
         ilike(incomingShipments.notes, `%${search}%`)
       )
     );
   }
 
-  const whereClause = whereConditions.length > 0 
-    ? whereConditions.reduce((acc, condition) => and(acc, condition)) 
-    : undefined;
+  const whereClause = whereConditions.length > 1 
+    ? and(...whereConditions) 
+    : whereConditions[0];
 
-  // Get shipments with basic info
-  const shipments = await db
-    .select({
-      // Incoming shipment fields
-      id: incomingShipments.id,
-      tenantId: incomingShipments.tenantId,
-      warehouseId: incomingShipments.warehouseId,
-      batchReference: incomingShipments.batchReference,
-      courierId: incomingShipments.courierId,
-      courierName: incomingShipments.courierName,
-      trackingNumber: incomingShipments.trackingNumber,
-      arrivalDate: incomingShipments.arrivalDate,
-      expectedArrivalDate: incomingShipments.expectedArrivalDate,
-      actualArrivalDate: incomingShipments.actualArrivalDate,
-      status: incomingShipments.status,
-      receivedBy: incomingShipments.receivedBy,
-      receivedAt: incomingShipments.receivedAt,
-      processedBy: incomingShipments.processedBy,
-      processedAt: incomingShipments.processedAt,
-      notes: incomingShipments.notes,
-      createdAt: incomingShipments.createdAt,
-      updatedAt: incomingShipments.updatedAt,
-      
-      // Warehouse info
-      warehouseName: warehouses.name,
-      warehouseCode: warehouses.code,
-      
-      // Courier info
-      courierServiceName: couriers.name,
-      courierCode: couriers.code,
-      
-      // Processed by user info
-      processedByName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
-      processedByEmail: users.email,
-    })
-    .from(incomingShipments)
-    .leftJoin(warehouses, eq(incomingShipments.warehouseId, warehouses.id))
-    .leftJoin(couriers, eq(incomingShipments.courierId, couriers.id))
-    .leftJoin(users, eq(incomingShipments.processedBy, users.id))
-    .where(whereClause)
-    .orderBy(desc(incomingShipments.createdAt))
-    .limit(limit)
-    .offset(offset);
-
-  // Get total count for pagination
-  const [{ count: totalCount }] = await db
-    .select({ count: count() })
-    .from(incomingShipments)
-    .where(whereClause);
-
-  // Get all items for these shipments
-  const shipmentIds = shipments.map(s => s.id);
-  
-  let items: Array<any> = [];
-  if (shipmentIds.length > 0) {
-    items = await db
+  try {
+    // Get shipments with ONLY essential data for the history tab
+    const shipments = await db
       .select({
-        // Shipment item fields
-        id: incomingShipmentItems.id,
-        incomingShipmentId: incomingShipmentItems.incomingShipmentId,
-        trackingNumber: incomingShipmentItems.trackingNumber,
-        courierName: incomingShipmentItems.courierName,
-        courierTrackingUrl: incomingShipmentItems.courierTrackingUrl,
-        scannedBy: incomingShipmentItems.scannedBy,
-        scannedAt: incomingShipmentItems.scannedAt,
-        assignedCustomerProfileId: incomingShipmentItems.assignedCustomerProfileId,
-        assignedBy: incomingShipmentItems.assignedBy,
-        assignedAt: incomingShipmentItems.assignedAt,
-        assignmentStatus: incomingShipmentItems.assignmentStatus,
-        weightKg: incomingShipmentItems.weightKg,
-        lengthCm: incomingShipmentItems.lengthCm,
-        widthCm: incomingShipmentItems.widthCm,
-        heightCm: incomingShipmentItems.heightCm,
-        description: incomingShipmentItems.description,
-        estimatedValue: incomingShipmentItems.estimatedValue,
-        estimatedValueCurrency: incomingShipmentItems.estimatedValueCurrency,
-        notes: incomingShipmentItems.notes,
-        specialInstructions: incomingShipmentItems.specialInstructions,
-        isFragile: incomingShipmentItems.isFragile,
-        isHighValue: incomingShipmentItems.isHighValue,
-        requiresInspection: incomingShipmentItems.requiresInspection,
-        createdAt: incomingShipmentItems.createdAt,
-        updatedAt: incomingShipmentItems.updatedAt,
+        // Essential shipment fields only
+        id: incomingShipments.id,
+        tenantId: incomingShipments.tenantId,
+        warehouseId: incomingShipments.warehouseId,
+        batchReference: incomingShipments.batchReference,
+        courierName: incomingShipments.courierName,
+        status: incomingShipments.status,
+        arrivalDate: incomingShipments.arrivalDate,
+        notes: incomingShipments.notes,
+        createdAt: incomingShipments.createdAt,
         
-        // Package info (if converted)
-        packageId: packages.id,
-        packageStatus: packages.status,
-        packageInternalId: packages.internalId,
-        
-        // Customer info (if assigned)
-        customerId: customerProfiles.id,
-        customerName: sql<string>`${customerProfiles.firstName} || ' ' || ${customerProfiles.lastName}`,
-        customerEmail: customerProfiles.email,
+        // Only warehouse name for display
+        warehouseName: warehouses.name,
       })
-      .from(incomingShipmentItems)
-      .leftJoin(packages, eq(incomingShipmentItems.id, packages.incomingShipmentItemId))
-      .leftJoin(customerProfiles, eq(incomingShipmentItems.assignedCustomerProfileId, customerProfiles.id))
-      .where(or(...shipmentIds.map(id => eq(incomingShipmentItems.incomingShipmentId, id))));
-  }
+      .from(incomingShipments)
+      .leftJoin(warehouses, eq(incomingShipments.warehouseId, warehouses.id))
+      .where(whereClause)
+      .orderBy(desc(incomingShipments.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-  // Group items by shipment
-  const itemsByShipment = new Map();
-  items.forEach(item => {
-    if (!itemsByShipment.has(item.incomingShipmentId)) {
-      itemsByShipment.set(item.incomingShipmentId, []);
+    // Get total count for pagination
+    const [{ count: totalCount }] = await db
+      .select({ count: count() })
+      .from(incomingShipments)
+      .where(whereClause);
+
+    // Get MINIMAL item counts only (not full item details)
+    const shipmentIds = shipments.map(s => s.id);
+    let itemCounts: Record<string, { total: number; assigned: number; unassigned: number }> = {};
+
+    if (shipmentIds.length > 0) {
+      const itemCountResults = await db
+        .select({
+          incomingShipmentId: incomingShipmentItems.incomingShipmentId,
+          total: count(),
+          assigned: sql<number>`COUNT(CASE WHEN ${incomingShipmentItems.assignmentStatus} = 'assigned' THEN 1 END)`,
+          unassigned: sql<number>`COUNT(CASE WHEN ${incomingShipmentItems.assignmentStatus} = 'unassigned' THEN 1 END)`,
+        })
+        .from(incomingShipmentItems)
+        .where(inArray(incomingShipmentItems.incomingShipmentId, shipmentIds))
+        .groupBy(incomingShipmentItems.incomingShipmentId);
+
+      // Create lookup map for item counts
+      itemCounts = itemCountResults.reduce((acc, item) => {
+        acc[item.incomingShipmentId] = {
+          total: Number(item.total),
+          assigned: Number(item.assigned),
+          unassigned: Number(item.unassigned),
+        };
+        return acc;
+      }, {} as Record<string, { total: number; assigned: number; unassigned: number }>);
     }
-    itemsByShipment.get(item.incomingShipmentId).push(item);
-  });
 
-  // Format the response
-  const formattedShipments: IncomingShipmentWithItems[] = shipments.map(shipment => ({
-    ...shipment,
-    
-    // Warehouse info
-    warehouseName: shipment.warehouseName || undefined,
-    warehouseCode: shipment.warehouseCode || undefined,
-    
-    // Courier info
-    courier: shipment.courierId ? {
-      id: shipment.courierId,
-      name: shipment.courierServiceName || shipment.courierName || '',
-      code: shipment.courierCode || '',
-    } : undefined,
-    
-    // Items
-    items: (itemsByShipment.get(shipment.id) || []).map((item: any) => ({
-      ...item,
-      weightKg: item.weightKg ? parseFloat(item.weightKg.toString()) : null,
-      lengthCm: item.lengthCm ? parseFloat(item.lengthCm.toString()) : null,
-      widthCm: item.widthCm ? parseFloat(item.widthCm.toString()) : null,
-      heightCm: item.heightCm ? parseFloat(item.heightCm.toString()) : null,
-      estimatedValue: item.estimatedValue ? parseFloat(item.estimatedValue.toString()) : null,
+    // Transform to the expected format with minimal data
+    const transformedShipments: IncomingShipmentWithItems[] = shipments.map(shipment => {
+      const counts = itemCounts[shipment.id] || { total: 0, assigned: 0, unassigned: 0 };
       
-      package: item.packageId ? {
-        id: item.packageId,
-        status: item.packageStatus,
-        internalId: item.packageInternalId,
-      } : undefined,
-      
-      assignedToCustomer: item.customerId ? {
-        customerId: item.customerId,
-        customerName: item.customerName || '',
-        customerEmail: item.customerEmail || '',
-      } : undefined,
-    })),
-  }));
+      return {
+        id: shipment.id,
+        tenantId: shipment.tenantId,
+        warehouseId: shipment.warehouseId,
+        batchReference: shipment.batchReference,
+        courierName: shipment.courierName || null,
+        status: shipment.status,
+        arrivalDate: shipment.arrivalDate,
+        notes: shipment.notes,
+        createdAt: shipment.createdAt,
+        updatedAt: shipment.createdAt, // Use createdAt as fallback
+        
+        // Warehouse info (minimal)
+        warehouse: {
+          id: shipment.warehouseId,
+          name: shipment.warehouseName || 'Unknown',
+          code: '', // Not needed for display
+        },
+        
+        // Item summary (counts only, no detailed items)
+        items: [], // Empty array since we only need counts for history tab
+        itemCounts: counts,
+        
+        // Optional fields with defaults
+        courierId: null,
+        trackingNumber: null,
+        expectedArrivalDate: null,
+        actualArrivalDate: null,
+        receivedBy: null,
+        receivedAt: null,
+        processedBy: null,
+        processedAt: null,
+      };
+    });
 
-  const totalPages = Math.ceil(totalCount / limit);
+    const totalPages = Math.ceil(totalCount / limit);
 
-  return {
-    success: true,
-    data: formattedShipments,
-    pagination: {
-      page,
-      limit,
-      total: totalCount,
-      pages: totalPages,
-    },
-  };
+    return {
+      success: true,
+      data: transformedShipments,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        pages: totalPages,
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching incoming shipments:', error);
+    return {
+      success: false,
+      data: [],
+      pagination: {
+        page,
+        limit,
+        total: 0,
+        pages: 0,
+      },
+    };
+  }
 }

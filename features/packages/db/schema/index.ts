@@ -142,6 +142,7 @@ export const packages = pgTable('packages', {
   
   // Status and dates
   status: varchar('status', { length: 20 }).notNull().default('expected'),
+  statusNotes: text('status_notes'),
   expectedArrivalDate: date('expected_arrival_date'),
   receivedAt: timestamp('received_at'),
   readyToShipAt: timestamp('ready_to_ship_at'),

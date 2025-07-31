@@ -5,8 +5,10 @@ import { seedTenants } from './seed-tenants';
 import { seedUsersAndRoles } from './seed-users-roles';
 import { seedWarehouses } from './seed-warehouses';
 import { seedReferenceData, seedTenantSettings, seedSystemSettings } from './seed-settings';
+import { seedPackages } from './seed-packages';
 import { logSeedProgress, logSeedSuccess, logSeedError } from './utils';
 import { tenantSettings } from '@/features/settings/db/schema';
+import { seedCustomerProfiles } from './seed-customer-profiles';
 
 /**
  * Main seeder function that orchestrates all seeding operations
@@ -64,6 +66,38 @@ async function seed() {
     }
     logSeedSuccess('Completed updating default warehouse settings');
     
+    // Step 8: Seed customer profiles for customer users
+    logSeedProgress('Step 8: Seeding customer profiles...');
+    const customerProfileData = await seedCustomerProfiles(usersAndRoles.users, true);
+    logSeedSuccess(`Completed seeding ${customerProfileData.customerProfiles.length} customer profiles`);
+    
+    // Step 9: Seed packages and related data
+    logSeedProgress('Step 9: Seeding packages...');
+    // Get customer profile IDs from the newly created customer profiles
+    const customerProfileIds = customerProfileData.customerProfiles.map(profile => profile.id);
+    
+    // If no customer profiles exist, log error and skip package seeding
+    if (customerProfileIds.length === 0) {
+      logSeedError('No customer profiles available for package seeding');
+      return {
+        tenants,
+        referenceData,
+        systemData,
+        usersAndRoles,
+        warehouseData,
+        tenantSettingsData,
+        customerProfileData,
+        packageData: { packages: [], packageStatusHistory: [] }
+      };
+    }
+    
+    // Get warehouse IDs
+    const warehouseIds = warehouseData.warehouses.map(warehouse => warehouse.id);
+    
+    // Seed packages with reset option to clear existing data
+    const packageData = await seedPackages(tenantIds, warehouseIds, customerProfileIds, true);
+    logSeedSuccess(`Completed seeding ${packageData.packages.length} packages with ${packageData.packageStatusHistory.length} status history records`);
+    
     logSeedSuccess('Database seeding completed successfully!');
     return {
       tenants,
@@ -71,7 +105,9 @@ async function seed() {
       systemData,
       usersAndRoles,
       warehouseData,
-      tenantSettingsData
+      tenantSettingsData,
+      customerProfileData,
+      packageData
     };
   } catch (error: any) {
     logSeedError(`Error seeding database: ${error.message || 'Unknown error'}`);

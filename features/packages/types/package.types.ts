@@ -144,6 +144,19 @@ export interface PackageFilters {
   limit?: number;
 }
 
+export interface IncomingShipmentFilters {
+  search?: string;
+  status?: IncomingShipmentStatus;
+  warehouseId?: string;
+  courierId?: string;
+  courierName?: string;
+  batchReference?: string;
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  limit?: number;
+}
+
 export interface CreatePackageData {
   // Customer reference
   customerProfileId: string;
@@ -180,6 +193,7 @@ export interface CreatePackageData {
   
   // Status and dates
   status?: PackageStatus;
+  statusNotes?: string;
   expectedArrivalDate?: string;
   receivedAt?: string;
   readyToShipAt?: string;
@@ -263,11 +277,12 @@ export interface IncomingShipmentWithItems extends IncomingShipment {
 }
 
 export interface CreateIncomingShipmentData {
+  tenantId: string;
   warehouseId: string;
   batchReference: string;
   courierId?: string;
   courierName?: string;
-  trackingNumber?: string;
+  trackingNumbers?: string[];
   arrivalDate?: string;
   expectedArrivalDate?: string;
   actualArrivalDate?: string;

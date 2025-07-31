@@ -10,6 +10,7 @@ interface AdminUser {
   firstName: string | null;
   lastName: string | null;
   userType: 'admin' | 'staff';
+  tenantId: string;
 }
 
 export function useAdminAuth() {

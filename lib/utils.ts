@@ -9,3 +9,8 @@ export const formatNumber = (weight: unknown, fixed?: number): string => {
   const num = Number(weight);
   return Number.isFinite(num) ? `${num.toFixed(fixed || 1)}` : 'N/A';
 };
+
+export const formatWeight = (weight: unknown): string => {
+  const num = Number(weight);
+  return Number.isFinite(num) ? `${num.toFixed(1)} kg` : 'N/A';
+};

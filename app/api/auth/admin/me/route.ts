@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
         lastName: adminUser.lastName,
         userType: adminUser.userType,
         roles: adminUser.roles,
+        tenantId: adminUser.tenantId,
       }
     });
   } catch (error) {

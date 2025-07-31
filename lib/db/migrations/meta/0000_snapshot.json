@@ -1,5 +1,5 @@
 {
-  "id": "2ea69a74-d879-4ce6-8006-a978b7263246",
+  "id": "2b809187-8195-4c51-9996-e0981e0dca49",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2438,7 +2438,7 @@
         },
         "assignment_status": {
           "name": "assignment_status",
-          "type": "varchar(20)",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "default": "'pending'"
@@ -2574,6 +2574,45 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "incoming_shipment_items_scanned_by_users_id_fk": {
+          "name": "incoming_shipment_items_scanned_by_users_id_fk",
+          "tableFrom": "incoming_shipment_items",
+          "tableTo": "users",
+          "columnsFrom": [
+            "scanned_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "incoming_shipment_items_assigned_customer_profile_id_customer_profiles_id_fk": {
+          "name": "incoming_shipment_items_assigned_customer_profile_id_customer_profiles_id_fk",
+          "tableFrom": "incoming_shipment_items",
+          "tableTo": "customer_profiles",
+          "columnsFrom": [
+            "assigned_customer_profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "incoming_shipment_items_assigned_by_users_id_fk": {
+          "name": "incoming_shipment_items_assigned_by_users_id_fk",
+          "tableFrom": "incoming_shipment_items",
+          "tableTo": "users",
+          "columnsFrom": [
+            "assigned_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2649,7 +2688,7 @@
         },
         "status": {
           "name": "status",
-          "type": "varchar(20)",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "default": "'pending'"
@@ -2683,20 +2722,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "total_items": {
-          "name": "total_items",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "processed_items": {
-          "name": "processed_items",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
         },
         "created_at": {
           "name": "created_at",
@@ -2740,6 +2765,170 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "incoming_shipments_courier_id_couriers_id_fk": {
+          "name": "incoming_shipments_courier_id_couriers_id_fk",
+          "tableFrom": "incoming_shipments",
+          "tableTo": "couriers",
+          "columnsFrom": [
+            "courier_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "incoming_shipments_received_by_users_id_fk": {
+          "name": "incoming_shipments_received_by_users_id_fk",
+          "tableFrom": "incoming_shipments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "received_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "incoming_shipments_processed_by_users_id_fk": {
+          "name": "incoming_shipments_processed_by_users_id_fk",
+          "tableFrom": "incoming_shipments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "processed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.package_documents": {
+      "name": "package_documents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "package_id": {
+          "name": "package_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document_id": {
+          "name": "document_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document_type": {
+          "name": "document_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_primary": {
+          "name": "is_primary",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "attached_by": {
+          "name": "attached_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attached_at": {
+          "name": "attached_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "package_documents_package_id_packages_id_fk": {
+          "name": "package_documents_package_id_packages_id_fk",
+          "tableFrom": "package_documents",
+          "tableTo": "packages",
+          "columnsFrom": [
+            "package_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "package_documents_document_id_documents_id_fk": {
+          "name": "package_documents_document_id_documents_id_fk",
+          "tableFrom": "package_documents",
+          "tableTo": "documents",
+          "columnsFrom": [
+            "document_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "package_documents_attached_by_users_id_fk": {
+          "name": "package_documents_attached_by_users_id_fk",
+          "tableFrom": "package_documents",
+          "tableTo": "users",
+          "columnsFrom": [
+            "attached_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2765,17 +2954,17 @@
           "primaryKey": false,
           "notNull": true
         },
-        "status": {
-          "name": "status",
+        "from_status": {
+          "name": "from_status",
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
         },
-        "previous_status": {
-          "name": "previous_status",
+        "to_status": {
+          "name": "to_status",
           "type": "varchar(20)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "notes": {
           "name": "notes",
@@ -2829,6 +3018,19 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "package_status_history_changed_by_users_id_fk": {
+          "name": "package_status_history_changed_by_users_id_fk",
+          "tableFrom": "package_status_history",
+          "tableTo": "users",
+          "columnsFrom": [
+            "changed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2878,58 +3080,20 @@
           "primaryKey": false,
           "notNull": true
         },
-        "suite_code_captured": {
-          "name": "suite_code_captured",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "tracking_number_inbound": {
           "name": "tracking_number_inbound",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
-        "sender_name": {
-          "name": "sender_name",
+        "tracking_number_outbound": {
+          "name": "tracking_number_outbound",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
-        "sender_company": {
-          "name": "sender_company",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sender_tracking_url": {
-          "name": "sender_tracking_url",
-          "type": "varchar(500)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "estimated_value": {
-          "name": "estimated_value",
-          "type": "numeric(12, 2)",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'0'"
-        },
-        "estimated_value_currency": {
-          "name": "estimated_value_currency",
-          "type": "varchar(3)",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'USD'"
-        },
-        "weight_actual_kg": {
-          "name": "weight_actual_kg",
+        "weight_kg": {
+          "name": "weight_kg",
           "type": "numeric(8, 3)",
           "primaryKey": false,
           "notNull": false
@@ -2968,8 +3132,14 @@
           "name": "status",
           "type": "varchar(20)",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "default": "'expected'"
+        },
+        "status_notes": {
+          "name": "status_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "expected_arrival_date": {
           "name": "expected_arrival_date",
@@ -2992,6 +3162,12 @@
         "storage_expires_at": {
           "name": "storage_expires_at",
           "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -3113,6 +3289,19 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
+        "packages_customer_profile_id_customer_profiles_id_fk": {
+          "name": "packages_customer_profile_id_customer_profiles_id_fk",
+          "tableFrom": "packages",
+          "tableTo": "customer_profiles",
+          "columnsFrom": [
+            "customer_profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
         "packages_warehouse_id_warehouses_id_fk": {
           "name": "packages_warehouse_id_warehouses_id_fk",
           "tableFrom": "packages",
@@ -3132,6 +3321,19 @@
           "tableTo": "incoming_shipment_items",
           "columnsFrom": [
             "incoming_shipment_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "packages_processed_by_users_id_fk": {
+          "name": "packages_processed_by_users_id_fk",
+          "tableFrom": "packages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "processed_by"
           ],
           "columnsTo": [
             "id"

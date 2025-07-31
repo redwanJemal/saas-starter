@@ -2,11 +2,11 @@
 import { db } from '@/lib/db';
 import { 
   incomingShipments, 
-  incomingShipmentItems,
-  type IncomingShipment,
-  type IncomingShipmentItem,
-  type IncomingShipmentStatus,
-  type ItemAssignmentStatus
+  incomingShipmentItems, 
+  type IncomingShipment, 
+  type IncomingShipmentItem, 
+  type IncomingShipmentStatus, 
+  type ItemAssignmentStatus 
 } from '@/features/packages/db/schema';
 
 export interface CreateIncomingShipmentData {
@@ -85,42 +85,63 @@ export async function createIncomingShipmentWithItems(
   shipment: IncomingShipment;
   items: IncomingShipmentItem[];
 }> {
+  console.log('🔄 Starting transaction for shipment creation...');
+  console.log('📦 Shipment data:', JSON.stringify(shipmentData, null, 2));
+  console.log('📋 Items data count:', itemsData.length);
+  
   return await db.transaction(async (tx) => {
-    // Create the shipment
-    const [newShipment] = await tx
-      .insert(incomingShipments)
-      .values({
-        ...shipmentData,
-        status: shipmentData.status || 'pending',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Create the items
-    const newItems: IncomingShipmentItem[] = [];
-    
-    if (itemsData.length > 0) {
-      const itemsToInsert = itemsData.map(item => ({
-        ...item,
-        incomingShipmentId: newShipment.id,
-        assignmentStatus: item.assignmentStatus || 'pending',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }));
-
-      const createdItems = await tx
-        .insert(incomingShipmentItems)
-        .values(itemsToInsert)
+    try {
+      console.log('🔄 Creating shipment...');
+      
+      // Create the shipment
+      const [newShipment] = await tx
+        .insert(incomingShipments)
+        .values({
+          ...shipmentData,
+          status: shipmentData.status || 'pending',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
         .returning();
 
-      newItems.push(...createdItems);
-    }
+      console.log('✅ Shipment created:', newShipment.id);
 
-    return {
-      shipment: newShipment,
-      items: newItems,
-    };
+      // Create the items
+      const newItems: IncomingShipmentItem[] = [];
+      
+      if (itemsData.length > 0) {
+        console.log('🔄 Creating items...');
+        
+        const itemsToInsert = itemsData.map(item => ({
+          ...item,
+          incomingShipmentId: newShipment.id,
+          assignmentStatus: item.assignmentStatus || 'unassigned',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+
+        console.log('📦 Items to insert:', JSON.stringify(itemsToInsert, null, 2));
+
+        const createdItems = await tx
+          .insert(incomingShipmentItems)
+          .values(itemsToInsert)
+          .returning();
+
+        console.log('✅ Items created:', createdItems.length);
+        
+        newItems.push(...createdItems);
+      } else {
+        console.log('⚠️ No items to create');
+      }
+
+      return {
+        shipment: newShipment,
+        items: newItems,
+      };
+    } catch (error) {
+      console.error('❌ Transaction error:', error);
+      throw error;
+    }
   });
 }
 
@@ -136,7 +157,7 @@ export async function addItemToIncomingShipment(
     .values({
       ...itemData,
       incomingShipmentId: shipmentId,
-      assignmentStatus: itemData.assignmentStatus || 'pending',
+      assignmentStatus: itemData.assignmentStatus || 'unassigned',
       createdAt: new Date(),
       updatedAt: new Date(),
     })
@@ -159,7 +180,7 @@ export async function bulkCreateIncomingShipmentItems(
   const itemsToInsert = itemsData.map(item => ({
     ...item,
     incomingShipmentId: shipmentId,
-    assignmentStatus: item.assignmentStatus || 'pending',
+    assignmentStatus: item.assignmentStatus || 'unassigned',
     createdAt: new Date(),
     updatedAt: new Date(),
   }));
