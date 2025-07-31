@@ -15,6 +15,19 @@ export interface Customer {
   updatedAt: string;
 }
 
+
+export interface AdminCustomerSearchResult {
+  id: string;
+  name: string;
+  email: string;
+  customerId: string;
+}
+
+export interface AdminCustomerSearchResponse {
+  success: true;
+  customers: AdminCustomerSearchResult[];
+  message?: string;
+}
 export interface CustomerFilters {
   status?: string;
   search?: string;

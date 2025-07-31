@@ -1,100 +1,167 @@
 // app/admin/packages/assignment/page.tsx
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Users, Package, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
-import { UnassignedItemsTable } from '@/features/packages/components/assignment/unassigned-items-table';
 import { CustomerSearch } from '@/features/packages/components/assignment/customer-search';
-import { useIncomingShipmentItems, useAssignItems } from '@/features/packages/hooks/use-packages-query';
-import { useCustomers } from '@/features/customers/hooks/use-customers-query';
 import { toast } from 'sonner';
+
+interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  customerId: string;
+}
+
+interface UnassignedItem {
+  id: string;
+  trackingNumber: string;
+  courierName?: string;
+  scannedAt: string;
+  batchReference: string;
+  warehouseName: string;
+}
 
 export default function PackageAssignmentPage() {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
+  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
+  const [unassignedItems, setUnassignedItems] = useState<UnassignedItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [assigning, setAssigning] = useState(false);
 
-  // Data fetching
-  const { data: itemsResponse, refetch: refetchItems } = useIncomingShipmentItems({
-    assignmentStatus: 'unassigned',
-    page: 1,
-    limit: 50
-  });
+  // Fetch unassigned items on component mount
+  useEffect(() => {
+    fetchUnassignedItems();
+  }, []);
 
-  const { data: customersResponse } = useCustomers({
-    search: customerSearchQuery,
-    limit: 10
-  });
+  const fetchUnassignedItems = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/admin/incoming-shipment-items?assignmentStatus=unassigned&limit=50');
+      if (!response.ok) throw new Error('Failed to fetch items');
+      
+      const data = await response.json();
+      setUnassignedItems(data.data || []);
+    } catch (error) {
+      console.error('Error fetching unassigned items:', error);
+      toast.error('Failed to load unassigned items');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const assignItems = useAssignItems();
+  // Use useCallback to prevent the search function from being recreated on every render
+  const handleCustomerSearch = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setCustomerSearchResults([]);
+      return;
+    }
 
-  const unassignedItems = itemsResponse?.data || [];
-  const customers = customersResponse?.data || [];
+    setCustomerSearchLoading(true);
+    try {
+      const response = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(query)}&limit=10`);
+      if (!response.ok) throw new Error('Failed to search customers');
+      
+      const data = await response.json();
+      // Handle both possible response formats
+      const customers = data.customers || data.data || [];
+      setCustomerSearchResults(customers);
+    } catch (error) {
+      console.error('Error searching customers:', error);
+      toast.error('Failed to search customers');
+      setCustomerSearchResults([]);
+    } finally {
+      setCustomerSearchLoading(false);
+    }
+  }, []); // Empty dependency array since this function doesn't depend on any state
+
+  const handleItemSelection = (itemId: string, checked: boolean) => {
+    const newSelected = new Set(selectedItems);
+    if (checked) {
+      newSelected.add(itemId);
+    } else {
+      newSelected.delete(itemId);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedItems(new Set(unassignedItems.map(item => item.id)));
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
 
   const handleAssignItems = async () => {
-    if (!selectedCustomer || selectedItems.size === 0) {
+    if (selectedItems.size === 0 || !selectedCustomer) {
       toast.error('Please select items and a customer');
       return;
     }
 
+    setAssigning(true);
     try {
-      const assignments = Array.from(selectedItems).map(itemId => ({
-        itemId,
-        customerProfileId: selectedCustomer.id
-      }));
+      const response = await fetch('/api/admin/assign-packages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignments: Array.from(selectedItems),
+          customerProfileId: selectedCustomer.id
+        })
+      });
 
-      await assignItems.mutateAsync({ assignments });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to assign packages');
+      }
 
-      // Reset selections
+      const result = await response.json();
+      toast.success(`Successfully assigned ${selectedItems.size} items to ${selectedCustomer.name}`);
+      
+      // Reset selections and refresh data
       setSelectedItems(new Set());
       setSelectedCustomer(null);
-
-      // Refetch data
-      await refetchItems();
-
-      toast.success(
-        `Successfully assigned ${selectedItems.size} items to ${selectedCustomer.firstName} ${selectedCustomer.lastName}`
-      );
+      await fetchUnassignedItems();
     } catch (error) {
-      console.error('Assignment failed:', error);
-      toast.error('Failed to assign items');
+      console.error('Error assigning packages:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to assign packages');
+    } finally {
+      setAssigning(false);
     }
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="container mx-auto p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="mb-6">
+        <div className="flex items-center gap-4 mb-4">
           <Link href="/admin/packages">
             <Button variant="outline" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Packages
             </Button>
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Package className="h-6 w-6" />
-              Package Assignment
-            </h1>
-            <p className="text-gray-600">
-              Assign unassigned packages to customers
-            </p>
-          </div>
         </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Package Assignment</h1>
+        <p className="text-gray-600">
+          Assign scanned tracking numbers to customer accounts. Items must be assigned before packages can be created.
+        </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-orange-500" />
+              <Package className="h-5 w-5 text-orange-500" />
               <div>
                 <p className="text-sm font-medium">Unassigned Items</p>
                 <p className="text-2xl font-bold">{unassignedItems.length}</p>
@@ -102,7 +169,6 @@ export default function PackageAssignmentPage() {
             </div>
           </CardContent>
         </Card>
-        
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -114,14 +180,13 @@ export default function PackageAssignmentPage() {
             </div>
           </CardContent>
         </Card>
-        
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-green-500" />
               <div>
-                <p className="text-sm font-medium">Available Customers</p>
-                <p className="text-2xl font-bold">{customers.length}</p>
+                <p className="text-sm font-medium">Customer Selected</p>
+                <p className="text-2xl font-bold">{selectedCustomer ? '1' : '0'}</p>
               </div>
             </div>
           </CardContent>
@@ -129,96 +194,137 @@ export default function PackageAssignmentPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Unassigned Items */}
+        {/* Unassigned Items List */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>Unassigned Items</span>
-                <Badge variant="outline">
-                  {selectedItems.size} selected
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Unassigned Items
+                  <Badge variant="secondary">{unassignedItems.length}</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedItems.size === unassignedItems.length && unassignedItems.length > 0}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-sm text-gray-600">Select All</span>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <UnassignedItemsTable
-                items={unassignedItems}
-                selectedItems={selectedItems}
-                onSelectionChange={setSelectedItems}
-              />
+              {loading ? (
+                <div className="text-center py-8">
+                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-gray-400" />
+                  <p className="text-gray-600">Loading unassigned items...</p>
+                </div>
+              ) : unassignedItems.length > 0 ? (
+                <div className="space-y-2">
+                  {unassignedItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.has(item.id)}
+                        onChange={(e) => handleItemSelection(item.id, e.target.checked)}
+                        className="rounded"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium">{item.trackingNumber}</div>
+                        <div className="text-sm text-gray-500">
+                          {item.courierName} • {item.warehouseName}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          Batch: {item.batchReference} • Scanned: {new Date(item.scannedAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Unassigned Items</h3>
+                  <p className="text-gray-600 mb-4">All scanned items have been assigned to customers.</p>
+                  <Link href="/admin/packages/pre-receiving">
+                    <Button>
+                      <Package className="mr-2 h-4 w-4" />
+                      Go to Pre-Receiving
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Customer Selection */}
-        <div>
+        {/* Customer Assignment Panel */}
+        <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Select Customer</CardTitle>
+              <CardTitle>Customer Assignment</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Customer Search */}
-              <div>
-                <Input
-                  placeholder="Search customers..."
-                  value={customerSearchQuery}
-                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                />
-              </div>
-
-              {/* Customer List */}
+            <CardContent>
               <CustomerSearch
                 selectedCustomer={selectedCustomer}
                 onCustomerSelect={setSelectedCustomer}
-                onSearchChange={setCustomerSearchQuery}
+                onSearchChange={handleCustomerSearch}
+                searchResults={customerSearchResults}
+                isLoading={customerSearchLoading}
               />
+            </CardContent>
+          </Card>
 
-              {/* Selected Customer */}
-              {selectedCustomer && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">
-                        {selectedCustomer.firstName} {selectedCustomer.lastName}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {selectedCustomer.email}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        ID: {selectedCustomer.suiteCode}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedCustomer(null)}
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                </div>
-              )}
+          {/* Assignment Summary */}
+          {selectedItems.size > 0 && selectedCustomer && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Assignment Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    You are about to assign <strong>{selectedItems.size}</strong> item
+                    {selectedItems.size !== 1 ? 's' : ''} to{' '}
+                    <strong>{selectedCustomer.name}</strong> ({selectedCustomer.customerId}).
+                  </AlertDescription>
+                </Alert>
+                <Button
+                  onClick={handleAssignItems}
+                  disabled={assigning}
+                  className="w-full"
+                >
+                  {assigning ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Assigning...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Assign {selectedItems.size} Item{selectedItems.size !== 1 ? 's' : ''}
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
-              {/* Assignment Button */}
-              <Button
-                onClick={handleAssignItems}
-                disabled={
-                  assignItems.isPending || selectedItems.size === 0 || !selectedCustomer
-                }
-                className="mt-4"
-              >
-                {assignItems.isPending ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Assigning...
-                  </>
-                ) : (
-                  <>
-                    <Package className="mr-2 h-4 w-4" />
-                    Assign Items
-                  </>
-                )}
-              </Button>
+          {/* Help Card */}
+          <Card>
+            <CardContent className="p-4">
+              <h4 className="font-medium mb-2">How to Assign Items</h4>
+              <ol className="text-sm text-gray-600 space-y-1">
+                <li>1. Select items from the left panel</li>
+                <li>2. Search and select a customer</li>
+                <li>3. Click "Assign Items" to complete</li>
+              </ol>
             </CardContent>
           </Card>
         </div>

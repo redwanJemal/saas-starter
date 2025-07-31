@@ -12,7 +12,7 @@ export const customerApi = {
   },
 
   searchCustomers: async (query: string): Promise<ApiResponse<Customer[]>> => {
-    return apiClient.get('/customers/search', { params: { q: query } });
+    return apiClient.get('/admin/customers/search', { params: { q: query } });
   },
 
   // Mutations
