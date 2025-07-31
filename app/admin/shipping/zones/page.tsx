@@ -18,7 +18,7 @@ import { EditZoneDialog } from '@/features/shipping/components/edit-zone-dialog'
 import { DataTable } from '@/shared/components/data-table/data-table';
 
 interface ZonesResponse {
-  zones: Zone[];
+  data: Zone[];
   pagination: {
     page: number;
     limit: number;
@@ -77,8 +77,8 @@ export default function ShippingZonesPage() {
       const response = await fetch(`/api/admin/shipping/zones?${params}`);
       if (!response.ok) throw new Error('Failed to fetch zones');
 
-      const data: ZonesResponse = await response.json();
-      setZones(data.zones || []);
+      const data = await response.json();
+      setZones(data.data || []);
       setTotalPages(data.pagination?.pages || 1);
       setTotalItems(data.pagination?.total || 0);
     } catch (error) {

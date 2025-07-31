@@ -8,6 +8,7 @@ import { Building, Globe, DollarSign, Calendar, Weight, AlertTriangle } from 'lu
 import { ShippingRate, CURRENCY_CODES } from '../types/rate.types';
 import { ServiceTypeBadge } from './service-type-badge';
 import { RateActionsDropdown } from './rate-actions-dropdown';
+import { formatNumber } from '@/lib/utils';
 
 export const createRatesTableColumns = (
   onEdit: (rate: ShippingRate) => void,
@@ -60,15 +61,15 @@ export const createRatesTableColumns = (
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-sm">
             <DollarSign className="h-3 w-3 text-gray-400" />
-            <span className="font-medium">{symbol}{rate.baseRate.toFixed(2)}</span>
+            <span className="font-medium">{symbol}{formatNumber(rate.baseRate)}</span>
             <span className="text-gray-500">base</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Weight className="h-3 w-3 text-gray-400" />
-            <span className="font-medium">{symbol}{rate.perKgRate.toFixed(2)}/kg</span>
+            <span className="font-medium">{symbol}{formatNumber(rate.perKgRate)}/kg</span>
           </div>
           <div className="text-xs text-gray-500">
-            Min: {symbol}{rate.minCharge.toFixed(2)}
+            Min: {symbol}{formatNumber(rate.minCharge)}
           </div>
         </div>
       );

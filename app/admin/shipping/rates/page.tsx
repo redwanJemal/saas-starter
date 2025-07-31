@@ -27,7 +27,7 @@ interface Warehouse {
 }
 
 interface RatesResponse {
-  rates: ShippingRate[];
+  data: ShippingRate[];
   pagination: {
     page: number;
     limit: number;
@@ -97,7 +97,7 @@ export default function ShippingRatesPage() {
       if (!response.ok) throw new Error('Failed to fetch rates');
 
       const data: RatesResponse = await response.json();
-      setRates(data.rates || []);
+      setRates(data.data || []);
       setTotalPages(data.pagination?.pages || 1);
       setTotalItems(data.pagination?.total || 0);
     } catch (error) {
@@ -114,7 +114,7 @@ export default function ShippingRatesPage() {
       if (!response.ok) throw new Error('Failed to fetch warehouses');
 
       const data = await response.json();
-      setWarehouses(data.warehouses || []);
+      setWarehouses(data.data || []);
     } catch (error) {
       console.error('Error fetching warehouses:', error);
     }
@@ -126,7 +126,7 @@ export default function ShippingRatesPage() {
       if (!response.ok) throw new Error('Failed to fetch zones');
 
       const data = await response.json();
-      setZones(data.zones || []);
+      setZones(data.data || []);
     } catch (error) {
       console.error('Error fetching zones:', error);
     }
@@ -308,7 +308,7 @@ export default function ShippingRatesPage() {
           <SelectItem value="all">All Warehouses</SelectItem>
           {warehouses.map(warehouse => (
             <SelectItem key={warehouse.id} value={warehouse.id}>
-              {warehouse.name}
+              {warehouse?.name}
             </SelectItem>
           ))}
         </SelectContent>
@@ -322,7 +322,7 @@ export default function ShippingRatesPage() {
           <SelectItem value="all">All Zones</SelectItem>
           {zones.map(zone => (
             <SelectItem key={zone.id} value={zone.id}>
-              {zone.name}
+              {zone?.name}
             </SelectItem>
           ))}
         </SelectContent>
