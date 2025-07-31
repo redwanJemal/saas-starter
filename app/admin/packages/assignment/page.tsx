@@ -113,7 +113,9 @@ export default function PackageAssignmentPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          assignments: Array.from(selectedItems),
+          assignments: Array.from(selectedItems).map(itemId => ({
+            itemId,
+          })),
           customerProfileId: selectedCustomer.id
         })
       });

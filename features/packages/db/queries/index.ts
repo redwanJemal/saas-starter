@@ -12,11 +12,12 @@ export * from './packages/get-package-statistics.query';
 // Incoming Shipments
 export * from './incoming-shipments/get-incoming-shipments.query';
 export * from './incoming-shipments/get-incoming-shipment-by-id.query';
-export * from './incoming-shipments/get-incoming-shipment-items.query'; // Added new export
+export * from './incoming-shipments/get-incoming-shipment-items.query';
 export * from './incoming-shipments/create-incoming-shipment.query';
 export * from './incoming-shipments/update-incoming-shipment.query';
 export * from './incoming-shipments/delete-incoming-shipment.query';
 export * from './incoming-shipments/shipment-items.query';
+export * from './incoming-shipments/assign-incoming-shipment-items.query'; // Add the new assignment query
 
 // Package Documents
 export * from './package-documents/attach-document.query';
