@@ -86,6 +86,56 @@ export const queryKeys = {
 
   },
 
+  
+  shipping: {
+    all: ['shipping'] as const,
+    
+    // Zone keys
+    zones: {
+      all: ['shipping', 'zones'] as const,
+      lists: () => ['shipping', 'zones', 'list'] as const,
+      list: (filters: any) => ['shipping', 'zones', 'list', filters] as const,
+      details: () => ['shipping', 'zones', 'detail'] as const,
+      detail: (id: string) => ['shipping', 'zones', 'detail', id] as const,
+      search: (query: string) => ['shipping', 'zones', 'search', query] as const,
+    },
+    
+    // Shipping rate keys
+    rates: {
+      all: ['shipping', 'rates'] as const,
+      lists: () => ['shipping', 'rates', 'list'] as const,
+      list: (filters: any) => ['shipping', 'rates', 'list', filters] as const,
+      details: () => ['shipping', 'rates', 'detail'] as const,
+      detail: (id: string) => ['shipping', 'rates', 'detail', id] as const,
+      zone: (zoneId: string, warehouseId?: string) => 
+        ['shipping', 'rates', 'zone', zoneId, warehouseId] as const,
+      calculate: (request: any) => ['shipping', 'rates', 'calculate', request] as const,
+    },
+    
+    // Shipment keys
+    shipments: {
+      all: ['shipping', 'shipments'] as const,
+      lists: () => ['shipping', 'shipments', 'list'] as const,
+      list: (filters: any) => ['shipping', 'shipments', 'list', filters] as const,
+      details: () => ['shipping', 'shipments', 'detail'] as const,
+      detail: (id: string) => ['shipping', 'shipments', 'detail', id] as const,
+      packages: (shipmentId: string) => ['shipping', 'shipments', shipmentId, 'packages'] as const,
+    },
+    
+    // Tracking keys
+    tracking: {
+      all: ['shipping', 'tracking'] as const,
+      events: (shipmentId: string) => ['shipping', 'tracking', 'events', shipmentId] as const,
+      statusHistory: (shipmentId: string) => ['shipping', 'tracking', 'status-history', shipmentId] as const,
+    },
+    
+    // Statistics keys
+    statistics: () => ['shipping', 'statistics'] as const,
+    
+    // Utility keys
+    carriers: () => ['shipping', 'carriers'] as const,
+    serviceTypes: () => ['shipping', 'service-types'] as const,
+  },
   // Warehouses
   warehouses: {
     all: ['warehouses'] as const,
