@@ -38,7 +38,7 @@ export function PackageTable({
   const clearSelection = useGlobalStore(state => state.clearSelection);
 
   // Mutations
-  const bulkUpdateStatus = useBulkUpdatePackageStatus(Array.from(selections));
+  const bulkUpdateStatus = useBulkUpdatePackageStatus();
 
   // Table configuration
   const columns = useMemo<ColumnDef<Package>[]>(() => [
