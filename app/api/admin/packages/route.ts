@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       storageExpiresAt: body.storageExpiresAt,
       
       // Warehouse assignment
-      warehouseId: body.warehouseId,
+      warehouseId: body.warehouseId ?? '8689f564-e3f8-46c6-8d37-a087adbe6f61',
       
       // Notes and instructions
       warehouseNotes: body.warehouseNotes,
