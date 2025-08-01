@@ -69,7 +69,7 @@ export function AdminSidebar({
     >
       <div className="h-full flex flex-col overflow-hidden">
         {/* Admin Header */}
-        <div className="p-4 border-b border-gray-200 flex-shrink-0">
+        <div className="px-4 py-2 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-center">
             <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3'}`}>
               <div className="bg-orange-100 p-2 rounded-lg">

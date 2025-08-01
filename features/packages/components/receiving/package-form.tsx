@@ -67,6 +67,7 @@ export function PackageForm({ assignedItem, onSubmit, onCancel, isSubmitting = f
 
   const handleSubmit = async () => {
     const packageData: CreatePackageData = {
+      tenantId: '',
       customerProfileId: assignedItem.assignedCustomerProfileId,
       incomingShipmentItemId: assignedItem.id,
       trackingNumberInbound: assignedItem.trackingNumber,

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/shared/components/data-table/data-table';
 import { Package, PackageFilters } from '../types/package.types';
-import { usePackages, useBulkUpdatePackageStatus } from '../hooks/use-packages-query';
+import { useBulkUpdatePackageStatus, usePackages } from '../hooks/use-packages-query';
 import { useGlobalStore } from '@/shared/stores/global-store';
 import { PackageStatusBadge } from './package-status-badge';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,7 @@ export function PackageTable({
   const clearSelection = useGlobalStore(state => state.clearSelection);
 
   // Mutations
-  const bulkUpdateStatus = useBulkUpdatePackageStatus();
+  const bulkUpdateStatus = useBulkUpdatePackageStatus(Array.from(selections));
 
   // Table configuration
   const columns = useMemo<ColumnDef<Package>[]>(() => [
@@ -134,7 +134,7 @@ export function PackageTable({
     const selectedIds = Array.from(selections);
     if (selectedIds.length === 0) return;
 
-    bulkUpdateStatus.mutate({ ids: selectedIds, status });
+    bulkUpdateStatus.mutate({ packageIds: selectedIds, action: 'update_status'});
   };
 
   const bulkActions = variant === 'admin' && selections.size > 0 ? (
