@@ -3,17 +3,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth/admin';
 import { updatePackageStatus } from '@/features/packages/db/queries';
-import type { PackageRouteContext, PackageStatus } from '@/features/packages/types/package.types';
+import type { PackageStatus } from '@/features/packages/types/package.types';
+import type { RouteContext } from '@/lib/types/route';
 
 export async function PATCH(
   request: NextRequest,
-  context: PackageRouteContext
+  context: RouteContext
 ) {
   try {
     // Check permission
     const adminUser = await requirePermission('packages.update');
 
-    const { id } = context.params;
+    const { id } = await context.params;
 
     // Validate package ID
     if (!id) {

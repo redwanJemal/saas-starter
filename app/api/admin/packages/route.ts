@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       estimatedValueCurrency: body.estimatedValueCurrency,
       
       // Physical characteristics
-      weightActualKg: body.weightActualKg ? parseFloat(body.weightActualKg) : undefined,
+      weightInKg: body.weightInKg ? parseFloat(body.weightInKg) : undefined,
       lengthCm: body.lengthCm ? parseFloat(body.lengthCm) : undefined,
       widthCm: body.widthCm ? parseFloat(body.widthCm) : undefined,
       heightCm: body.heightCm ? parseFloat(body.heightCm) : undefined,

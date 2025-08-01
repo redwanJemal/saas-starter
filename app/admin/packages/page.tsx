@@ -395,7 +395,10 @@ export default function AdminPackagesPage() {
 
       {/* Table */}
       <Card>
-        <CardContent className="p-0">
+        <CardHeader>
+          <CardTitle>Packages ({packages.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
           <DataTable
             columns={columns}
             data={packages}

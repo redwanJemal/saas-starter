@@ -44,7 +44,7 @@ export async function POST(
 
     // Add actual weight if provided
     if (body.actualWeight) {
-      updateData.weightActualKg = parseFloat(body.actualWeight);
+      updateData.weightInKg = parseFloat(body.actualWeight);
     }
 
     // Add actual dimensions if provided

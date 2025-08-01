@@ -15,17 +15,22 @@ import { eq, desc, sql } from 'drizzle-orm';
 import { couriers, customerProfiles, documents, users, warehouses } from '@/lib/db/schema';
 
 export interface PackageWithHistory extends Package {
-  // Customer info
-  customerId: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone?: string;
+  // Customer info as object
+  customer: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+  };
   
-  // Warehouse info
-  warehouseName?: string;
-  warehouseCode?: string;
-  warehouseCity?: string;
-  warehouseCountryCode?: string;
+  // Warehouse info as object
+  warehouse?: {
+    id: string;
+    name: string;
+    code: string;
+    city: string;
+    countryCode: string;
+  };
   
   // Courier info (from incoming shipment)
   courierName?: string;
@@ -78,6 +83,13 @@ export interface PackageWithHistory extends Package {
     uploadedByName?: string;
     uploadedByEmail?: string;
   }>;
+}
+
+function calculateVolumetricWeight(lengthCm: number, widthCm: number, heightCm: number): number | undefined {
+  if (lengthCm && widthCm && heightCm) {
+    return (Number(lengthCm) * Number(widthCm) * Number(heightCm)) / 5000;
+  }
+  return undefined;
 }
 
 export async function getPackageById(id: string): Promise<PackageWithHistory | null> {
@@ -219,98 +231,39 @@ export async function getPackageById(id: string): Promise<PackageWithHistory | n
     .where(eq(packageDocuments.packageId, id))
     .orderBy(desc(packageDocuments.attachedAt));
 
-  // Structure the response
-  const response: PackageWithHistory = {
-    // Base package data with proper type conversion
-    id: packageDetails.id,
-    tenantId: packageDetails.tenantId,
-    internalId: packageDetails.internalId || '',
-    trackingNumberInbound: packageDetails.trackingNumberInbound || '',
-    trackingNumberOutbound: packageDetails.trackingNumberOutbound || '',
+  // Format the response with nested objects for customer and warehouse
+  const formattedPackage: PackageWithHistory = {
+    ...packageDetails,
     
-    // Customer and warehouse
-    customerProfileId: packageDetails.customerProfileId,
-    warehouseId: packageDetails.warehouseId,
+    // Restructure customer as an object
+    customer: {
+      id: packageDetails.customerId,
+      name: packageDetails.customerName,
+      email: packageDetails.customerEmail,
+      phone: packageDetails.customerPhone || '',
+    },
     
-    // Package details
-    description: packageDetails.description || '',
+    // Restructure warehouse as an object
+    warehouse: packageDetails.warehouseId ? {
+      id: packageDetails.warehouseId,
+      name: packageDetails.warehouseName || '',
+      code: packageDetails.warehouseCode || '',
+      city: packageDetails.warehouseCity || '',
+      countryCode: packageDetails.warehouseCountryCode || '',
+    } : undefined,
     
-    // Physical characteristics with proper number conversion
-    weightKg: packageDetails.weightKg,
-    lengthCm: packageDetails.lengthCm,
-    widthCm: packageDetails.widthCm,
-    heightCm: packageDetails.heightCm,
-    volumetricWeightKg: packageDetails.volumetricWeightKg,
-    chargeableWeightKg: packageDetails.chargeableWeightKg,
-    
-    // Status and dates
-    status: packageDetails.status as PackageStatus,
-    expectedArrivalDate: packageDetails.expectedArrivalDate,
-    receivedAt: packageDetails.receivedAt,
-    readyToShipAt: packageDetails.readyToShipAt,
-    storageExpiresAt: packageDetails.storageExpiresAt,
-    
-    // Notes and instructions
-    warehouseNotes: packageDetails.warehouseNotes || '',
-    customerNotes: packageDetails.customerNotes || '',
-    specialInstructions: packageDetails.specialInstructions || '',
-    
-    // Package characteristics
-    isFragile: packageDetails.isFragile || false,
-    isHighValue: packageDetails.isHighValue || false,
-    requiresAdultSignature: packageDetails.requiresAdultSignature || false,
-    isRestricted: packageDetails.isRestricted || false,
-    
-    // Customs information
-    customsDeclaration: packageDetails.customsDeclaration || '',
-    customsValue: packageDetails.customsValue,
-    customsValueCurrency: packageDetails.customsValueCurrency || '',
-    countryOfOrigin: packageDetails.countryOfOrigin || '',
-    hsCode: packageDetails.hsCode || '',
-    
-    // Pre-receiving workflow
-    incomingShipmentItemId: packageDetails.incomingShipmentItemId,
-    
-    // Processing info
-    processedBy: packageDetails.processedBy,
-    processedAt: packageDetails.processedAt,
-    createdAt: packageDetails.createdAt,
-    updatedAt: packageDetails.updatedAt,
-    
-    // Enhanced fields
-    customerId: packageDetails.customerId || '',
-    customerName: packageDetails.customerName || '',
-    customerEmail: packageDetails.customerEmail || '',
-    customerPhone: packageDetails.customerPhone || '',
-    
-    warehouseName: packageDetails.warehouseName || '',
-    warehouseCode: packageDetails.warehouseCode || '',
-    warehouseCity: packageDetails.warehouseCity || '',
-    warehouseCountryCode: packageDetails.warehouseCountryCode || '',
-    
-    courierName: packageDetails.courierName || '',
-    batchReference: packageDetails.batchReference || '',
-    
-    processedByName: '', // Would need additional join for processed by user
-    processedByEmail: '', // Would need additional join for processed by user
-    
-    // Calculate dimensional weight for display if dimensions exist
-    calculatedVolumetricWeight: packageDetails.lengthCm && packageDetails.widthCm && packageDetails.heightCm 
-      ? (Number(packageDetails.lengthCm) * Number(packageDetails.widthCm) * Number(packageDetails.heightCm)) / 5000 
-      : undefined,
-    
-    // Pre-receiving workflow context
+    // Add pre-receiving info
     preReceivingInfo: packageDetails.incomingShipmentItemId ? {
-      incomingShipmentId: packageDetails.incomingShipmentId || undefined,
+      incomingShipmentId: packageDetails.incomingShipmentId,
       itemId: packageDetails.incomingShipmentItemId,
       assignmentStatus: packageDetails.itemAssignmentStatus as ItemAssignmentStatus,
       expectedArrivalDate: packageDetails.expectedArrivalDateShipment,
       actualArrivalDate: packageDetails.actualArrivalDate,
-      batchReference: packageDetails.batchReference || undefined,
-      courierName: packageDetails.courierName || undefined,
+      batchReference: packageDetails.batchReference,
+      courierName: packageDetails.courierName,
     } : undefined,
     
-    // Status history
+    // Add status history and documents
     statusHistory: statusHistory.map(history => ({
       id: history.id,
       fromStatus: history.fromStatus as PackageStatus,
@@ -320,26 +273,44 @@ export async function getPackageById(id: string): Promise<PackageWithHistory | n
       changedByName: history.changedByName || '',
       changedByEmail: history.changedByEmail || '',
     })),
-    
-    // Documents
     documents: packageDocs.map(doc => ({
       id: doc.id,
       documentType: doc.documentType,
-      isPrimary: doc.isPrimary,
-      displayOrder: doc.displayOrder,
+      isPrimary: doc.isPrimary || false,
+      displayOrder: doc.displayOrder || 0,
       attachedAt: doc.attachedAt,
       documentId: doc.documentId,
       fileName: doc.fileName,
       originalFileName: doc.originalFileName,
       fileUrl: doc.fileUrl,
-      fileSize: doc.fileSize,
-      mimeType: doc.mimeType,
+      fileSize: doc.fileSize || 0,
+      mimeType: doc.mimeType || 'application/octet-stream',
       isPublic: doc.isPublic || false,
       uploadedAt: doc.uploadedAt,
       uploadedByName: doc.uploadedByName || '',
       uploadedByEmail: doc.uploadedByEmail || '',
     })),
+    
+    // Calculate volumetric weight if needed
+    calculatedVolumetricWeight: calculateVolumetricWeight(
+      Number(packageDetails.lengthCm) || 0, 
+      Number(packageDetails.widthCm) || 0, 
+      Number(packageDetails.heightCm) || 0
+    ),
   };
 
-  return response;
+  // Remove the flat properties that are now in nested objects
+  delete (formattedPackage as any).customerId;
+  delete (formattedPackage as any).customerName;
+  delete (formattedPackage as any).customerEmail;
+  delete (formattedPackage as any).customerPhone;
+  delete (formattedPackage as any).warehouseName;
+  delete (formattedPackage as any).warehouseCode;
+  delete (formattedPackage as any).warehouseCity;
+  delete (formattedPackage as any).warehouseCountryCode;
+  delete (formattedPackage as any).incomingShipmentId;
+  delete (formattedPackage as any).expectedArrivalDateShipment;
+  delete (formattedPackage as any).itemAssignmentStatus;
+
+  return formattedPackage;
 }

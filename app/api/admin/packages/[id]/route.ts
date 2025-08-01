@@ -111,8 +111,8 @@ export async function PATCH(
     if (body.estimatedValueCurrency !== undefined) updateData.estimatedValueCurrency = body.estimatedValueCurrency;
     
     // Physical characteristics
-    if (body.weightActualKg !== undefined) {
-      updateData.weightActualKg = body.weightActualKg ? parseFloat(body.weightActualKg) : undefined;
+    if (body.weightInKg !== undefined) {
+      updateData.weightInKg = body.weightInKg ? parseFloat(body.weightInKg) : undefined;
     }
     if (body.lengthCm !== undefined) {
       updateData.lengthCm = body.lengthCm ? parseFloat(body.lengthCm) : undefined;

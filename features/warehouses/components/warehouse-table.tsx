@@ -2,14 +2,14 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/shared/components/data-table/data-table';
 import { Warehouse, WarehouseFilters } from '../types/warehouse.types';
 import { useWarehouses } from '../hooks/use-warehouses-query';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Activity, AlertTriangle, Building, Package } from 'lucide-react';
+import { Activity, AlertTriangle, Building, Car, Package } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -22,6 +22,7 @@ import {
   WarehouseCreatedCell,
   WarehouseActionsCell
 } from './table-cells';
+import { useGlobalStore } from '@/shared/stores/global-store';
 
 interface WarehouseTableProps {
   filters?: WarehouseFilters;
@@ -36,8 +37,44 @@ export function WarehouseTable({
   const { data: response, isLoading, error, refetch } = useWarehouses(filters);
   const warehouses = response?.data || [];
 
+  // Global state
+  const selections = useGlobalStore(state => state.selections.warehouses || new Set<string>());
+  const setSelection = useGlobalStore(state => state.setSelection);
+  const clearSelection = useGlobalStore(state => state.clearSelection);
+
+  // Row selection
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+
+  // Update global selection state when row selection changes
+  useEffect(() => {
+    const selectedIds = Object.keys(rowSelection).filter(id => rowSelection[id]);
+    setSelection('warehouses', new Set(selectedIds));
+  }, [rowSelection, setSelection]);
+
   // Table configuration
   const columns = useMemo<ColumnDef<Warehouse>[]>(() => [
+    {
+      id: 'select',
+      header: ({ table }: { table: any }) => (
+        <input
+          type="checkbox"
+          checked={table.getIsAllPageRowsSelected()}
+          onChange={e => table.toggleAllPageRowsSelected(!!e.target.checked)}
+          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          checked={row.getIsSelected()}
+          onChange={e => row.toggleSelected(!!e.target.checked)}
+          onClick={e => e.stopPropagation()}
+          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       accessorKey: 'name',
       header: 'Warehouse Details',
@@ -161,33 +198,23 @@ export function WarehouseTable({
 
   return (
     <div className="space-y-4">
-      {/* Summary bar */}
-      <div className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg">
-        <div>
-          Showing {warehouses.length} of {response?.pagination?.total || 0} warehouses
-        </div>
-        <div className="flex items-center gap-4">
-          <span>
-            Active: {warehouses.filter(w => w.status === 'active').length}
-          </span>
-          <span>
-            Accepting: {warehouses.filter(w => w.acceptsNewPackages).length}
-          </span>
-          <span>
-            Total Packages: {warehouses.reduce((sum, w) => sum + (w.stats?.totalPackages || 0), 0)}
-          </span>
-        </div>
-      </div>
-
-      {/* Data Table */}
-      <DataTable
+      <Card>
+        <CardHeader>
+          <CardTitle>Warehouses ({warehouses.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataTable
             columns={columns}
             data={warehouses}
+            searchKey="name"
+            searchPlaceholder="Search warehouses..."
             isLoading={isLoading}
             onRefresh={refetch}
+            onRowClick={onWarehouseClick}
             pagination={response?.pagination}
-            searchPlaceholder="Search warehouses by name, code, or location..."
           />
+        </CardContent>
+      </Card>
     </div>
   );
 }

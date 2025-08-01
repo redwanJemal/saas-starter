@@ -185,7 +185,7 @@ export interface CreatePackageData {
   estimatedValueCurrency?: string;
   
   // Physical characteristics
-  weightActualKg?: number;
+  weightInKg?: number;
   lengthCm?: number;
   widthCm?: number;
   heightCm?: number;

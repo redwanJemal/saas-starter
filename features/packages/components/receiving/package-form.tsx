@@ -76,7 +76,7 @@ export function PackageForm({ assignedItem, onSubmit, onCancel, isSubmitting = f
       senderName: formData.senderName,
       senderCompany: formData.senderCompany || undefined,
       senderAddress: formData.senderAddress || undefined,
-      weightActualKg: parseFloat(formData.weightKg) || 0,
+      weightInKg: parseFloat(formData.weightKg) || 0,
       lengthCm: formData.lengthCm ? parseFloat(formData.lengthCm) : undefined,
       widthCm: formData.widthCm ? parseFloat(formData.widthCm) : undefined,
       heightCm: formData.heightCm ? parseFloat(formData.heightCm) : undefined,

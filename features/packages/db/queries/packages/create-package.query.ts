@@ -38,7 +38,7 @@ export interface CreatePackageData {
   senderTrackingUrl?: string;
   
   // Physical properties
-  weightActualKg?: number;
+  weightInKg?: number;
   lengthCm?: number;
   widthCm?: number;
   heightCm?: number;
@@ -90,13 +90,10 @@ export async function createPackage(
     // Set default status if not provided
     const status: PackageStatus = data.status || 'expected';
 
-    console.log(data);
-    
     // Create the package
     const [newPackage] = await tx
       .insert(packages)
       .values({
-        tenantId: data.tenantId,
         // Customer reference
         customerProfileId: data.customerProfileId,
         
@@ -124,7 +121,7 @@ export async function createPackage(
         senderTrackingUrl: data.senderTrackingUrl,
         
         // Physical properties
-        weightActualKg: data.weightActualKg,
+        weightInKg: data.weightInKg,
         lengthCm: data.lengthCm,
         widthCm: data.widthCm,
         heightCm: data.heightCm,
@@ -134,7 +131,7 @@ export async function createPackage(
           data.heightCm
         ),
         chargeableWeightKg: data.chargeableWeightKg || calculateChargeableWeight(
-          data.weightActualKg,
+          data.weightInKg,
           data.volumetricWeightKg || calculateVolumetricWeight(
             data.lengthCm, 
             data.widthCm, 
