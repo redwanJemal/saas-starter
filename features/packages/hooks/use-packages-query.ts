@@ -100,18 +100,22 @@ export function useIncomingShipmentItems(filters: {
     const queryClient = useQueryClient();
     
     return useMutation({
-      mutationFn: async ({ assignments }: { 
-        assignments: Array<{ 
-          itemId: string; 
-          customerProfileId: string; 
-        }> 
+      mutationFn: async ({ 
+        assignments, 
+        customerProfileId 
+      }: { 
+        assignments: Array<{ itemId: string }>;
+        customerProfileId: string;
       }) => {
         const response = await fetch('/api/admin/assign-packages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ assignments }),
+          body: JSON.stringify({
+            assignments,
+            customerProfileId
+          }),
         });
   
         if (!response.ok) {
@@ -121,13 +125,14 @@ export function useIncomingShipmentItems(filters: {
   
         return response.json();
       },
-      onSuccess: () => {
+      onSuccess: (data, { customerProfileId }) => {
         // Invalidate relevant queries
         queryClient.invalidateQueries({ queryKey: ['incomingShipmentItems'] });
         queryClient.invalidateQueries({ queryKey: ['packages'] });
+        queryClient.invalidateQueries({ queryKey: ['customerPackages', customerProfileId] });
         toast.success('Items assigned successfully');
       },
-      onError: (error: any) => {
+      onError: (error: Error) => {
         toast.error(error?.message || 'Failed to assign items');
       },
     });

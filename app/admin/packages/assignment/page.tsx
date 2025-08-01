@@ -11,13 +11,8 @@ import { ArrowLeft, Users, Package, CheckCircle, AlertCircle, RefreshCw } from '
 import Link from 'next/link';
 import { CustomerSearch } from '@/features/packages/components/assignment/customer-search';
 import { toast } from 'sonner';
-
-interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  customerId: string;
-}
+import { Customer } from '@/features/customers/types/customer.types';
+import { useAssignItems } from '@/features/packages/hooks/use-packages-query';
 
 interface UnassignedItem {
   id: string;
@@ -35,7 +30,8 @@ export default function PackageAssignmentPage() {
   const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
   const [unassignedItems, setUnassignedItems] = useState<UnassignedItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [assigning, setAssigning] = useState(false);
+  
+  const { mutate: assignItems, isPending: isAssigning } = useAssignItems();
 
   // Fetch unassigned items on component mount
   useEffect(() => {
@@ -81,7 +77,7 @@ export default function PackageAssignmentPage() {
     } finally {
       setCustomerSearchLoading(false);
     }
-  }, []); // Empty dependency array since this function doesn't depend on any state
+  }, []); 
 
   const handleItemSelection = (itemId: string, checked: boolean) => {
     const newSelected = new Set(selectedItems);
@@ -101,43 +97,29 @@ export default function PackageAssignmentPage() {
     }
   };
 
-  const handleAssignItems = async () => {
+  const handleAssignItems = () => {
     if (selectedItems.size === 0 || !selectedCustomer) {
       toast.error('Please select items and a customer');
       return;
     }
 
-    setAssigning(true);
-    try {
-      const response = await fetch('/api/admin/assign-packages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assignments: Array.from(selectedItems).map(itemId => ({
-            itemId,
-          })),
-          customerProfileId: selectedCustomer.id
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to assign packages');
+    assignItems(
+      {
+        assignments: Array.from(selectedItems).map(itemId => ({ itemId })),
+        customerProfileId: selectedCustomer.id
+      },
+      {
+        onSuccess: () => {
+          // Reset selections and refresh data
+          setSelectedItems(new Set());
+          setSelectedCustomer(null);
+          fetchUnassignedItems();
+        },
+        onError: (error) => {
+          console.error('Error assigning packages:', error);
+        }
       }
-
-      const result = await response.json();
-      toast.success(`Successfully assigned ${selectedItems.size} items to ${selectedCustomer.name}`);
-      
-      // Reset selections and refresh data
-      setSelectedItems(new Set());
-      setSelectedCustomer(null);
-      await fetchUnassignedItems();
-    } catch (error) {
-      console.error('Error assigning packages:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to assign packages');
-    } finally {
-      setAssigning(false);
-    }
+    );
   };
 
   return (
@@ -297,23 +279,22 @@ export default function PackageAssignmentPage() {
                     <strong>{selectedCustomer.name}</strong> ({selectedCustomer.customerId}).
                   </AlertDescription>
                 </Alert>
-                <Button
-                  onClick={handleAssignItems}
-                  disabled={assigning}
-                  className="w-full"
-                >
-                  {assigning ? (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      Assigning...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      Assign {selectedItems.size} Item{selectedItems.size !== 1 ? 's' : ''}
-                    </>
-                  )}
-                </Button>
+                <div className="mt-6 flex justify-end">
+                  <Button 
+                    onClick={handleAssignItems} 
+                    disabled={selectedItems.size === 0 || !selectedCustomer || isAssigning}
+                    className="min-w-32"
+                  >
+                    {isAssigning ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        Assigning...
+                      </>
+                    ) : (
+                      `Assign ${selectedItems.size} Items`
+                    )}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

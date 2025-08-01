@@ -10,13 +10,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { User, Mail, Phone, Search, X, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Customer } from '@/features/customers/types/customer.types';
 
-interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  customerId: string;
-}
 
 interface CustomerSearchProps {
   selectedCustomer: Customer | null;

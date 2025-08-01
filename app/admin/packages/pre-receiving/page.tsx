@@ -1,7 +1,7 @@
 // app/admin/packages/pre-receiving/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,12 +17,16 @@ import { UnassignedItemsTable } from '@/features/packages/components/assignment/
 import { useCustomers } from '@/features/customers/hooks/use-customers-query';
 import { IncomingShipmentItem } from '@/features/packages/types/package.types';
 import { BulkScanForm } from '@/features/packages/components/pre-receiving/bulk-scan-form';
+import { toast } from 'sonner';
+import { Customer } from '@/features/customers/types/customer.types';
 
 export default function PreReceivingPage() {
   const [activeTab, setActiveTab] = useState('scan');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+    const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
+    const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
   
   // Data fetching
   const { data: shipmentsResponse } = useIncomingShipments({
@@ -61,27 +65,41 @@ export default function PreReceivingPage() {
 
   const handleAssignItems = async () => {
     if (!selectedCustomer || selectedItems.size === 0) return;
-    
-    const assignments = Array.from(selectedItems).map(itemId => {
-      // Find the shipment that contains this item
-      const item = unassignedItems.find((item: IncomingShipmentItem) => item.id === itemId);
-      
-      return {
-        shipmentId: item?.incomingShipmentId || '',
-        itemId,
-        customerProfileId: selectedCustomer.id,
-        assignmentReason: 'manual_assignment',
-      };
-    });
-    
     try {
-      await assignItems.mutateAsync({ assignments });
+      await assignItems.mutateAsync({assignments: Array.from(selectedItems).map(itemId => ({ itemId })),
+      customerProfileId: selectedCustomer.id});
       setSelectedItems(new Set());
     } catch (error) {
       console.error('Failed to assign items:', error);
     }
   };
 
+  
+    // Use useCallback to prevent the search function from being recreated on every render
+    const handleCustomerSearch = useCallback(async (query: string) => {
+      if (query.length < 2) {
+        setCustomerSearchResults([]);
+        return;
+      }
+  
+      setCustomerSearchLoading(true);
+      try {
+        const response = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(query)}&limit=10`);
+        if (!response.ok) throw new Error('Failed to search customers');
+        
+        const data = await response.json();
+        // Handle both possible response formats
+        const customers = data.customers || data.data || [];
+        setCustomerSearchResults(customers);
+      } catch (error) {
+        console.error('Error searching customers:', error);
+        toast.error('Failed to search customers');
+        setCustomerSearchResults([]);
+      } finally {
+        setCustomerSearchLoading(false);
+      }
+    }, []); 
+    
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -235,8 +253,9 @@ export default function PreReceivingPage() {
                   <CustomerSearch
                     selectedCustomer={selectedCustomer}
                     onCustomerSelect={setSelectedCustomer}
-                    onSearchChange={setCustomerSearchQuery}
-                    searchResults={customers}
+                    onSearchChange={handleCustomerSearch}
+                    searchResults={customerSearchResults}
+                    isLoading={customerSearchLoading}
                   />
                 </CardContent>
               </Card>
