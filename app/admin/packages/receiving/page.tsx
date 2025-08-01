@@ -165,7 +165,7 @@ export default function PackageReceivingPage() {
                       </div>
                       <div className="flex items-center gap-1 text-xs text-gray-600">
                         <User className="h-3 w-3" />
-                        {item.customerName}
+                        {item.assignedCustomerProfileId}
                       </div>
                       <div className="text-xs text-gray-500">
                         {item.courierName} • {item.warehouseId}

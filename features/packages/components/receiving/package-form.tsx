@@ -19,7 +19,7 @@ interface PackageFormProps {
     trackingNumber: string;
     customerName: string;
     customerEmail: string;
-    customerId: string;
+    assignedCustomerProfileId: string;
     courierName?: string;
   };
   onSubmit: (data: CreatePackageData) => Promise<void>;
@@ -67,7 +67,7 @@ export function PackageForm({ assignedItem, onSubmit, onCancel, isSubmitting = f
 
   const handleSubmit = async () => {
     const packageData: CreatePackageData = {
-      customerProfileId: assignedItem.customerId,
+      customerProfileId: assignedItem.assignedCustomerProfileId,
       incomingShipmentItemId: assignedItem.id,
       trackingNumberInbound: assignedItem.trackingNumber,
       description: formData.description,
@@ -121,7 +121,7 @@ export function PackageForm({ assignedItem, onSubmit, onCancel, isSubmitting = f
             )}
             <div>
               <label className="font-medium">Customer ID</label>
-              <div className="font-mono">{assignedItem.customerId}</div>
+              <div className="font-mono">{assignedItem.assignedCustomerProfileId}</div>
             </div>
           </div>
         </CardContent>
