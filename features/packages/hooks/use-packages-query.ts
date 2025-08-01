@@ -12,6 +12,7 @@ import type {
   IncomingShipmentFilters,
   CreateIncomingShipmentData,
 } from '@/features/packages/types/package.types';
+import { bulkUpdatePackages } from '../db/queries';
 
 // ============================================================================
 // QUERY KEYS
@@ -138,6 +139,36 @@ export function useIncomingShipmentItems(filters: {
     });
   }
   
+  
+export function useBulkUpdatePackageStatus(id: string[]) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (action: BulkPackageAction) => {
+      // TODO: Get the current user ID from your auth context
+      const updatedBy = 'system'; // Replace with actual user ID from auth
+      return await bulkUpdatePackages(action, updatedBy);
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate and refetch packages query
+      queryClient.invalidateQueries({ queryKey: ['packages'] });
+      
+      // Show success toast
+      if (data.updated > 0) {
+        toast(`Updated status for ${data.updated} package(s) successfully`);
+      }
+      
+      if (data.failed.length > 0) {
+        toast(`Failed to update ${data.failed.length} package(s)`);
+      }
+    },
+    onError: (error) => {
+      console.error('Error updating package statuses:', error);
+      toast(`Error updating package statuses`);
+    },
+  });
+}
+
   /**
    * Function to assign incoming shipment items (used in API routes)
    */
