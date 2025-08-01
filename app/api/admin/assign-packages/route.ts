@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     for (const assignment of body.assignments) {
       if (!assignment.itemId) {
         return NextResponse.json(
-          { error: 'Each assignment must have itemId and customerProfileId' },
+          { error: 'Each assignment must have itemId' },
           { status: 400 }
         );
       }
@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
 
     const assignments = body.assignments.map((assignment: any) => ({
       itemId: assignment.itemId,
+      incomingShipmentId: assignment.incomingShipmentId,
       customerProfileId,
       assignedBy: adminUser.id,
     }));

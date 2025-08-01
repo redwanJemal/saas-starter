@@ -6,6 +6,7 @@ import { eq, and } from 'drizzle-orm';
 
 export interface AssignIncomingShipmentItemsData {
   itemId: string;
+  incomingShipmentId?: string;
   customerProfileId: string;
   assignedBy: string;
 }

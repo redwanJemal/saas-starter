@@ -66,8 +66,20 @@ export default function PreReceivingPage() {
   const handleAssignItems = async () => {
     if (!selectedCustomer || selectedItems.size === 0) return;
     try {
-      await assignItems.mutateAsync({assignments: Array.from(selectedItems).map(itemId => ({ itemId })),
-      customerProfileId: selectedCustomer.id});
+      // Find the items that are selected
+      const selectedItemsData = unassignedItems.filter((item: any) => selectedItems.has(item.id));
+      
+      // Create assignments with itemId and incomingShipmentId
+      const assignments = selectedItemsData.map((item: any) => ({ 
+        itemId: item.id,
+        incomingShipmentId: item.incomingShipmentId // Include the incoming shipment ID
+      }));
+      
+      await assignItems.mutateAsync({
+        assignments,
+        customerProfileId: selectedCustomer.id
+      });
+      
       setSelectedItems(new Set());
     } catch (error) {
       console.error('Failed to assign items:', error);
