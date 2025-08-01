@@ -3,6 +3,7 @@
 // Packages
 export * from './packages/get-packages.query';
 export * from './packages/get-package-by-id.query';
+export * from './packages/get-package-by-incoming-shipment-item-id.query';
 export * from './packages/create-package.query';
 export * from './packages/update-package.query';
 export * from './packages/delete-package.query';

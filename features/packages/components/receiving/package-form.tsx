@@ -29,6 +29,7 @@ interface PackageFormProps {
 
 export function PackageForm({ assignedItem, onSubmit, onCancel, isSubmitting = false }: PackageFormProps) {
   const [formData, setFormData] = useState({
+    
     // Basic Info
     description: '',
     senderName: '',

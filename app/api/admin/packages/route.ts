@@ -2,9 +2,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth/admin';
-import { getPackages } from '@/features/packages/db/queries';
+import { 
+  getPackages, 
+  createPackage, 
+  getPackageById,
+  getPackageByIncomingShipmentItemId,
+  updateIncomingShipmentItem,
+  markIncomingShipmentAsReceived 
+} from '@/features/packages/db/queries';
 import type { CreatePackageData, PackageFilters } from '@/features/packages/types/package.types';
-import { createPackage } from '@/features/packages/db/queries/packages/create-package.query';
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,23 +84,24 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check permission
-    const adminUser = await requirePermission('packages.create');
-
-    // Parse and validate request body
+    // Check permissions
+    const adminUser = await requirePermission('packages.write');
+    // Parse request body
     const body = await request.json();
     
-    // Validate required fields
-    if (!body.customerProfileId) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: 'Customer profile ID is required' 
-        },
-        { status: 400 }
-      );
+    // Check if a package already exists for this incoming shipment item
+    if (body.incomingShipmentItemId) {
+      const existingPackage = await getPackageByIncomingShipmentItemId(body.incomingShipmentItemId);
+      if (existingPackage) {
+        return NextResponse.json({
+          success: false,
+          message: 'A package already exists for this incoming shipment item',
+          data: existingPackage
+        }, { status: 400 });
+      }
     }
 
+    // Prepare package data
     const packageData: CreatePackageData = {
       tenantId: adminUser.tenantId,
       // Customer reference
@@ -164,6 +171,17 @@ export async function POST(request: NextRequest) {
 
     // Create the package
     const result = await createPackage(packageData, adminUser.id);
+
+    // Update the incoming shipment item status to received
+    if (body.incomingShipmentItemId) {
+      await updateIncomingShipmentItem(
+        body.incomingShipmentItemId, 
+        { 
+          assignmentStatus: 'received' 
+        }, 
+        adminUser.id
+      );
+    }
 
     // Return the created package with success response
     return NextResponse.json({
