@@ -7,9 +7,10 @@ import {
   type Package,
   type PackageStatus 
 } from '@/features/packages/db/schema';
-import { gte, lt, and } from 'drizzle-orm';
+import { and, gte, lt, sql } from 'drizzle-orm';
 
 export interface CreatePackageData {
+  tenantId: string;
   // Customer reference
   customerProfileId: string;
   
@@ -88,11 +89,14 @@ export async function createPackage(
     
     // Set default status if not provided
     const status: PackageStatus = data.status || 'expected';
+
+    console.log(data);
     
     // Create the package
     const [newPackage] = await tx
       .insert(packages)
       .values({
+        tenantId: data.tenantId,
         // Customer reference
         customerProfileId: data.customerProfileId,
         
@@ -182,7 +186,7 @@ export async function createPackage(
       .insert(packageStatusHistory)
       .values({
         packageId: newPackage.id,
-        fromStatus: null, // Initial creation
+        fromStatus: "initial", // Initial creation
         toStatus: status,
         changeReason: 'package_created',
         changedBy: createdBy || null,
@@ -211,8 +215,8 @@ async function generateInternalId(tx: any): Promise<string> {
   const endOfDay = new Date(startOfDay);
   endOfDay.setDate(endOfDay.getDate() + 1);
   
-  const [{ count }] = await tx
-    .select({ count: packages.id })
+  const result = await tx
+    .select({ count: sql<number>`count(${packages.id})` })
     .from(packages)
     .where(
       and(
@@ -221,6 +225,8 @@ async function generateInternalId(tx: any): Promise<string> {
       )
     );
   
+  // Handle case when no packages exist yet today
+  const count = result[0]?.count ?? 0;
   const sequence = (count + 1).toString().padStart(4, '0');
   return `${prefix}-${sequence}`;
 }

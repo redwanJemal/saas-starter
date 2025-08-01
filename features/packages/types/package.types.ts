@@ -158,6 +158,7 @@ export interface IncomingShipmentFilters {
 }
 
 export interface CreatePackageData {
+  tenantId: string;
   // Customer reference
   customerProfileId: string;
   suiteCodeCaptured?: string;

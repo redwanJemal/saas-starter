@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     const packageData: CreatePackageData = {
+      tenantId: adminUser.tenantId,
       // Customer reference
       customerProfileId: body.customerProfileId,
       suiteCodeCaptured: body.suiteCodeCaptured,
