@@ -1,59 +1,93 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { signToken, verifyToken } from '@/lib/auth/session';
-
-const protectedRoutes = '/dashboard';
-const adminRoutes = '/admin';
+import { verifyToken } from '@/lib/auth/session';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const sessionCookie = request.cookies.get('session');
-  
-  const isProtectedRoute = pathname.startsWith(protectedRoutes);
-  const isAdminRoute = pathname.startsWith(adminRoutes);
 
-  // Check if user is authenticated for protected routes
-  if ((isProtectedRoute || isAdminRoute) && !sessionCookie) {
-    const redirectUrl = isAdminRoute ? '/sign-in?redirect=/admin' : '/sign-in';
-    return NextResponse.redirect(new URL(redirectUrl, request.url));
+  // Skip middleware for login pages and static files
+  if (
+    pathname.startsWith('/admin/login') ||
+    pathname.startsWith('/sign-in') ||
+    pathname.startsWith('/sign-up') ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname === '/favicon.ico'
+  ) {
+    return NextResponse.next();
   }
 
-  let res = NextResponse.next();
+  // Check if this is an admin route
+  if (pathname.startsWith('/admin')) {
+    const sessionCookie = request.cookies.get('session');
+    
+    if (!sessionCookie?.value) {
+      return NextResponse.redirect(
+        new URL(`/admin/login?redirect=${encodeURIComponent(pathname)}`, request.url)
+      );
+    }
 
-  if (sessionCookie && request.method === 'GET') {
     try {
-      const parsed = await verifyToken(sessionCookie.value);
+      const sessionData = await verifyToken(sessionCookie.value);
       
-      // Check user type for admin routes
-      if (isAdminRoute && parsed.user) {
-        // We can't easily get user type from the session token without a DB call
-        // For now, we'll let the request through and handle authorization in the components
-        // In production, you might want to include user type in the JWT or make a quick DB check
+      if (!sessionData || !sessionData.user) {
+        return NextResponse.redirect(
+          new URL(`/admin/login?redirect=${encodeURIComponent(pathname)}`, request.url)
+        );
       }
 
-      const expiresInOneDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      res.cookies.set({
-        name: 'session',
-        value: await signToken({
-          ...parsed,
-          expires: expiresInOneDay.toISOString()
-        }),
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        expires: expiresInOneDay
-      });
-    } catch (error) {
-      console.error('Error updating session:', error);
-      res.cookies.delete('session');
-      if (isProtectedRoute || isAdminRoute) {
-        const redirectUrl = isAdminRoute ? '/sign-in?redirect=/admin' : '/sign-in';
-        return NextResponse.redirect(new URL(redirectUrl, request.url));
+      // Check if session is expired
+      if (new Date(sessionData.expires) < new Date()) {
+        return NextResponse.redirect(
+          new URL(`/admin/login?redirect=${encodeURIComponent(pathname)}`, request.url)
+        );
       }
+
+      // TODO: Add admin/staff user type check here
+      // This would require querying the database to check userType
+      // For now, we'll let the layout components handle the admin check
+
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      return NextResponse.redirect(
+        new URL(`/admin/login?redirect=${encodeURIComponent(pathname)}`, request.url)
+      );
     }
   }
 
-  return res;
+  // Check customer routes (existing logic)
+  if (pathname.startsWith('/dashboard') || pathname.startsWith('/packages')) {
+    const sessionCookie = request.cookies.get('session');
+    
+    if (!sessionCookie?.value) {
+      return NextResponse.redirect(
+        new URL(`/sign-in?redirect=${encodeURIComponent(pathname)}`, request.url)
+      );
+    }
+
+    try {
+      const sessionData = await verifyToken(sessionCookie.value);
+      
+      if (!sessionData || !sessionData.user) {
+        return NextResponse.redirect(
+          new URL(`/sign-in?redirect=${encodeURIComponent(pathname)}`, request.url)
+        );
+      }
+
+      if (new Date(sessionData.expires) < new Date()) {
+        return NextResponse.redirect(
+          new URL(`/sign-in?redirect=${encodeURIComponent(pathname)}`, request.url)
+        );
+      }
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      return NextResponse.redirect(
+        new URL(`/sign-in?redirect=${encodeURIComponent(pathname)}`, request.url)
+      );
+    }
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
