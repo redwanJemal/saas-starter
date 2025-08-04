@@ -6,15 +6,16 @@ import { requirePermission } from '@/lib/auth/admin';
 import { eq, and, sum } from 'drizzle-orm';
 import { ShippingRateCalculator } from '@/lib/services/shipping-rate-calculator';
 import { StorageFeeCalculator } from '@/lib/services/storage-fee-calculator';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check admin permissions
     const adminUser = await requirePermission('shipments.manage');
-    const shipmentId = await params.id;
+    const shipmentId = (await RouteContext.params).id;
     const body = await request.json();
 
     const {
@@ -254,12 +255,12 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check admin permissions
     await requirePermission('shipments.read');
-    const shipmentId = await params.id;
+    const shipmentId = (await RouteContext.params).id;
 
     // Get available services for this shipment
     const shipmentQuery = await db

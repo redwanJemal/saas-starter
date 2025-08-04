@@ -5,6 +5,7 @@ import { binLocations, warehouses } from '@/lib/db/schema';
 import { NextRequest, NextResponse } from 'next/server';
 import { eq, and, like, desc, count } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function GET(request: NextRequest) {
   try {
@@ -220,11 +221,11 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const adminUser = await requirePermission('admin.update');
-    const binId = params.id;
+    const binId = (await RouteContext.params).id;
     const body = await request.json();
     
     const {

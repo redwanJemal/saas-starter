@@ -5,10 +5,11 @@ import { shipments, shipmentPackages, packages, addresses } from '@/lib/db/schem
 import { getUserWithProfile } from '@/lib/db/queries';
 import { ShippingRateCalculator } from '@/lib/services/shipping-rate-calculator';
 import { eq, and, sum } from 'drizzle-orm';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -16,7 +17,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
     const searchParams = request.nextUrl.searchParams;
     const serviceType = searchParams.get('service_type') || 'standard';
 
@@ -139,7 +140,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -147,7 +148,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
     const body = await request.json();
     const { serviceType = 'standard' } = body;
 

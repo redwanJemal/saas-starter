@@ -4,10 +4,11 @@ import { db } from '@/lib/db/drizzle';
 import { addresses } from '@/lib/db/schema';
 import { getUserWithProfile } from '@/lib/db/queries';
 import { eq, and } from 'drizzle-orm';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -15,7 +16,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const addressId = params.id;
+    const addressId = (await RouteContext.params).id;
     const body = await request.json();
     const { addressType } = body;
 

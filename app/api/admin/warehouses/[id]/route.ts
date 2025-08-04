@@ -4,16 +4,17 @@ import { db } from '@/lib/db/drizzle';
 import { warehouses, packages, shipments } from '@/lib/db/schema';
 import { eq, sql, count } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     await requirePermission('warehouses.manage');
 
-    const warehouseId = params.id;
+    const warehouseId = (await RouteContext.params).id;
 
     // Get warehouse details
     const [warehouse] = await db
@@ -72,13 +73,13 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     await requirePermission('warehouses.manage');
 
-    const warehouseId = params.id;
+    const warehouseId = (await RouteContext.params).id;
     const body = await request.json();
 
     // Check if warehouse exists
@@ -134,13 +135,13 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     await requirePermission('warehouses.manage');
 
-    const warehouseId = params.id;
+    const warehouseId = (await RouteContext.params).id;
 
     // Check if warehouse has packages or shipments
     const [packageCount] = await db

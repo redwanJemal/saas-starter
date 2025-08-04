@@ -4,15 +4,16 @@ import { db } from '@/lib/db/drizzle';
 import { shippingRates, zones, warehouses } from '@/lib/db/schema';
 import { requirePermission } from '@/lib/auth/admin';
 import { eq, and, or, gte, lte } from 'drizzle-orm';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     const adminUser = await requirePermission('admin.read');
-    const rateId = params.id;
+    const rateId = (await RouteContext.params).id;
 
     // Get rate details with zone and warehouse info
     const rateQuery = await db
@@ -75,12 +76,12 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     const adminUser = await requirePermission('admin.update');
-    const rateId = params.id;
+    const rateId = (await RouteContext.params).id;
     const body = await request.json();
 
     const {
@@ -190,7 +191,7 @@ export async function PUT(
           or(
             eq(shippingRates.effectiveUntil, null),
             gte(shippingRates.effectiveUntil, effectiveFrom)
-          )
+          ) 
         );
       } else {
         overlapConditions.push(
@@ -270,12 +271,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     const adminUser = await requirePermission('admin.delete');
-    const rateId = params.id;
+    const rateId = (await RouteContext.params).id;
 
     // Check if rate exists and belongs to tenant
     const existingRate = await db

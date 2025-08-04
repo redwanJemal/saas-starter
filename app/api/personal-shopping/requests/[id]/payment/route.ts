@@ -11,11 +11,12 @@ import {
 import { getUserWithProfile } from '@/lib/db/queries';
 import { eq } from 'drizzle-orm';
 import { stripe } from '@/lib/payments/stripe';
+import { RouteContext } from '@/lib/utils/route';
 
 // POST /api/personal-shopping/requests/[id]/payment - Create Stripe checkout session
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -23,7 +24,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const requestId = params.id;
+    const requestId = (await RouteContext.params).id;
 
     // Get current request
     const [personalShopperRequest] = await db

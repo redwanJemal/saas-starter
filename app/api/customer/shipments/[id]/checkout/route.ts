@@ -13,10 +13,11 @@ import { StorageFeeCalculator } from '@/lib/services/storage-fee-calculator';
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { getUserWithProfile } from '@/lib/db/queries';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -24,7 +25,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
 
     // Get shipment details with current costs
     const shipmentQuery = await db
@@ -196,7 +197,7 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -204,7 +205,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
 
     // Get shipment checkout details
     const shipmentQuery = await db

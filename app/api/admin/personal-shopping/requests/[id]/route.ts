@@ -11,15 +11,16 @@ import {
 } from '@/lib/db/schema';
 import { requirePermission } from '@/lib/auth/admin';
 import { eq, desc, sql } from 'drizzle-orm';
+import { RouteContext } from '@/lib/utils/route';
 
 // GET /api/admin/personal-shopping/requests/[id] - Get specific request details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const adminUser = await requirePermission('personal_shopping.read');
-    const requestId = params.id;
+    const requestId = (await RouteContext.params).id;
 
     // Get the request with customer details
     const [requestData] = await db
@@ -105,11 +106,11 @@ export async function GET(
 // PATCH /api/admin/personal-shopping/requests/[id] - Update request status and quote
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const adminUser = await requirePermission('personal_shopping.manage');
-    const requestId = params.id;
+    const requestId = (await RouteContext.params).id;
     const body = await request.json();
 
     // Get current request

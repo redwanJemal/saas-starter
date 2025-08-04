@@ -4,10 +4,11 @@ import { db } from '@/lib/db/drizzle';
 import { shipments, shipmentPackages, packages, addresses, warehouses, zones } from '@/lib/db/schema';
 import { getUserWithProfile } from '@/lib/db/queries';
 import { eq, and, or } from 'drizzle-orm';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -15,7 +16,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
 
     // Get shipment details with proper address joins
     const shipmentQuery = await db

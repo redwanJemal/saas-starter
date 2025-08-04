@@ -10,17 +10,18 @@ import {
 } from '@/lib/db/schema';
 import { eq, isNull, and } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
+import { RouteContext } from '@/lib/utils/route';
 
 // Get package info and bin assignment history
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     await requirePermission('packages.read');
     
-    const packageId = params.id;
+    const packageId = (await RouteContext.params).id;
 
     // Get package info with current bin assignment
     const packageQuery = await db
@@ -131,13 +132,13 @@ export async function GET(
 // Assign package to bin location
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     const adminUser = await requirePermission('packages.manage');
     
-    const packageId = params.id;
+    const packageId = (await RouteContext.params).id;
     const body = await request.json();
     const { binId, assignmentReason, notes } = body;
 
@@ -262,13 +263,13 @@ export async function POST(
 // Remove bin assignment
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     const adminUser = await requirePermission('packages.manage');
     
-    const packageId = params.id;
+    const packageId = (await RouteContext.params).id;
     const body = await request.json();
     const { removalReason, notes } = body;
 

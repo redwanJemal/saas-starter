@@ -5,10 +5,11 @@ import { shipments } from '@/lib/db/schema';
 import { getUserWithProfile } from '@/lib/db/queries';
 import { eq, and } from 'drizzle-orm';
 import { stripe } from '@/lib/payments/stripe';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -16,7 +17,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
     const body = await request.json();
     const { paymentIntentId } = body;
 
@@ -128,7 +129,7 @@ export async function POST(
 // Get payment status for a shipment
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -136,7 +137,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
 
     // Get shipment payment status
     const shipmentQuery = await db

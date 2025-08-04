@@ -13,10 +13,11 @@ import { stripe } from '@/lib/payments/stripe';
 import { NextRequest, NextResponse } from 'next/server';
 import { and, count, eq } from 'drizzle-orm';
 import { generateInvoiceNumber } from '@/lib/utils/id-generator';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -24,7 +25,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
     const body = await request.json();
     const { paymentIntentId } = body;
 
@@ -302,7 +303,7 @@ export async function POST(
 // GET endpoint to check payment status
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -310,7 +311,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
     const { searchParams } = new URL(request.url);
     const paymentIntentId = searchParams.get('payment_intent');
 

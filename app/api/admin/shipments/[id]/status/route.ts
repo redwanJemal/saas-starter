@@ -5,16 +5,17 @@ import { shipments } from '@/lib/db/schema';
 import { shipmentStatusHistory } from '@/lib/db/schema/shipments';
 import { eq } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     const adminUser = await requirePermission('shipments.manage');
     
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
     const body = await request.json();
     const { status, notes, trackingNumber } = body;
 

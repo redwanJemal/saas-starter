@@ -4,10 +4,11 @@ import { db } from '@/lib/db/drizzle';
 import { packages, warehouses, incomingShipmentItems, incomingShipments, couriers } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { getUserWithProfile } from '@/lib/db/queries';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Get authenticated user and customer profile
@@ -20,7 +21,7 @@ export async function GET(
     }
 
     const customerId = userWithProfile.customerProfile.id;
-    const packageId = params.id;
+    const packageId = (await RouteContext.params).id;
 
     if (!packageId) {
       return NextResponse.json(

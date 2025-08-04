@@ -13,16 +13,17 @@ import {
 } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     await requirePermission('shipments.read');
 
-    const shipmentId = await params.id;
+    const shipmentId = (await RouteContext.params).id;
 
     // Get shipment with all related data including addresses
     const shipmentQuery = await db
@@ -203,11 +204,11 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const adminUser = await requirePermission('shipments.manage');
-    const shipmentId = await params.id;
+    const shipmentId = (await RouteContext.params).id;
     const body = await request.json();
 
     const {

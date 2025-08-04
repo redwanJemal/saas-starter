@@ -4,15 +4,16 @@ import { db } from '@/lib/db/drizzle';
 import { zones, zoneCountries } from '@/lib/db/schema';
 import { requirePermission } from '@/lib/auth/admin';
 import { eq, and, sql } from 'drizzle-orm';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     const adminUser = await requirePermission('admin.read');
-    const zoneId = params.id;
+    const zoneId = (await RouteContext.params).id;
 
     // Get zone details with countries
     const zoneQuery = await db
@@ -70,12 +71,12 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     const adminUser = await requirePermission('admin.update');
-    const zoneId = params.id;
+    const zoneId = (await RouteContext.params).id;
 
     const body = await request.json();
     const { name, description, isActive, countries = [] } = body;
@@ -177,12 +178,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     const adminUser = await requirePermission('admin.delete');
-    const zoneId = params.id;
+    const zoneId = (await RouteContext.params).id;
 
     // Check if zone exists and belongs to tenant
     const existingZone = await db

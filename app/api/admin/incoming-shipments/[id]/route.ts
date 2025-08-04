@@ -4,16 +4,17 @@ import { db } from '@/lib/db/drizzle';
 import { incomingShipments, incomingShipmentItems } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     await requirePermission('packages.read');
 
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
 
     // Get shipment details with related data
     const [shipmentDetails] = await db
@@ -71,7 +72,7 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
@@ -79,7 +80,7 @@ export async function PATCH(
 
     const body = await request.json();
     const { status, scanCompletedAt, manifestFileUrl } = body;
-    const shipmentId = (await params).id;
+    const shipmentId = (await RouteContext.params).id;
 
     console.log('🔄 PATCH incoming shipment:', { shipmentId, status, scanCompletedAt });
 
@@ -164,13 +165,13 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     await requirePermission('packages.manage');
 
-    const shipmentId = params.id;
+    const shipmentId = (await RouteContext.params).id;
 
     // Verify shipment exists and check if it can be deleted
     const [existingShipment] = await db

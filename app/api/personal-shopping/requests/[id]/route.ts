@@ -10,11 +10,12 @@ import {
 } from '@/lib/db/schema';
 import { getUserWithProfile } from '@/lib/db/queries';
 import { eq, desc, sql } from 'drizzle-orm';
+import { RouteContext } from '@/lib/utils/route';
 
 // GET /api/personal-shopping/requests/[id] - Get specific request details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -22,7 +23,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const requestId = params.id;
+    const requestId = (await RouteContext.params).id;
 
     // Get the request
     const [requestData] = await db
@@ -90,7 +91,7 @@ export async function GET(
 // PATCH /api/personal-shopping/requests/[id] - Update request (only if draft or submitted)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -98,7 +99,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const requestId = params.id;
+    const requestId = (await RouteContext.params).id;
     const body = await request.json();
 
     // Get current request
@@ -186,7 +187,7 @@ export async function PATCH(
 // DELETE /api/personal-shopping/requests/[id] - Cancel request (only if draft or submitted)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     const userWithProfile = await getUserWithProfile();
@@ -194,7 +195,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const requestId = params.id;
+    const requestId = (await RouteContext.params).id;
 
     // Get current request
     const [currentRequest] = await db
