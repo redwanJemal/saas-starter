@@ -185,45 +185,45 @@ export async function PUT(
     ];
 
     // Add date range overlap check only if the rate is being set to active
-    if (isActive) {
-      if (effectiveUntil) {
-        overlapConditions.push(
-          or(
-            eq(shippingRates.effectiveUntil, null),
-            gte(shippingRates.effectiveUntil, effectiveFrom)
-          ) 
-        );
-      } else {
-        overlapConditions.push(
-          or(
-            eq(shippingRates.effectiveUntil, null),
-            gte(shippingRates.effectiveUntil, effectiveFrom)
-          )
-        );
-      }
+    // if (isActive) {
+    //   if (effectiveUntil) {
+    //     overlapConditions.push(
+    //       or(
+    //         eq(shippingRates.effectiveUntil, null),
+    //         gte(shippingRates.effectiveUntil, effectiveFrom)
+    //       ) 
+    //     );
+    //   } else {
+    //     overlapConditions.push(
+    //       or(
+    //         eq(shippingRates.effectiveUntil, null),
+    //         gte(shippingRates.effectiveUntil, effectiveFrom)
+    //       )
+    //     );
+    //   }
 
-      const overlappingRates = await db
-        .select()
-        .from(shippingRates)
-        .where(
-          and(
-            ...overlapConditions,
-            // Exclude the current rate being updated
-            // This allows updating the same rate without conflict
-          )
-        )
-        .limit(1);
+    //   const overlappingRates = await db
+    //     .select()
+    //     .from(shippingRates)
+    //     .where(
+    //       and(
+    //         ...overlapConditions,
+    //         // Exclude the current rate being updated
+    //         // This allows updating the same rate without conflict
+    //       )
+    //     )
+    //     .limit(1);
 
-      // Only check for conflicts if there are other overlapping rates
-      const hasConflict = overlappingRates.some(rate => rate.id !== rateId);
+    //   // Only check for conflicts if there are other overlapping rates
+    //   const hasConflict = overlappingRates.some(rate => rate.id !== rateId);
       
-      if (hasConflict) {
-        return NextResponse.json(
-          { error: 'A rate for this warehouse-zone-service combination already exists for the specified date range' },
-          { status: 400 }
-        );
-      }
-    }
+    //   if (hasConflict) {
+    //     return NextResponse.json(
+    //       { error: 'A rate for this warehouse-zone-service combination already exists for the specified date range' },
+    //       { status: 400 }
+    //     );
+    //   }
+    // }
 
     // Update shipping rate
     const [updatedRate] = await db

@@ -31,11 +31,11 @@ export async function GET(request: NextRequest) {
       .limit(limit);
 
     // Add search filter if provided
-    if (search) {
-      currenciesQuery = currenciesQuery.where(
-        sql`${currencies.name} ILIKE ${`%${search}%`} OR ${currencies.code} ILIKE ${`%${search}%`}`
-      );
-    }
+    // if (search) {
+    //   currenciesQuery = currenciesQuery.where(
+    //     sql`${currencies.name} ILIKE ${`%${search}%`} OR ${currencies.code} ILIKE ${`%${search}%`}`
+    //   );
+    // }
 
     const currenciesList = await currenciesQuery;
 

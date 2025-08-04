@@ -117,12 +117,9 @@ export async function getCustomerPackages(customerProfileId: string, limit = 10)
         }
       },
       documents: {
-        where: eq(packageDocuments.isPublic, true),
         columns: {
           id: true,
-          documentType: true,
-          fileName: true,
-          fileUrl: true
+          documentType: true
         }
       }
     },

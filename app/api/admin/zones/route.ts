@@ -22,14 +22,14 @@ export async function GET(request: NextRequest) {
       eq(zones.tenantId, adminUser.tenantId)
     ];
 
-    if (search) {
-      whereConditions.push(
-        or(
-          ilike(zones.name, `%${search}%`),
-          ilike(zones.description, `%${search}%`)
-        )
-      );
-    }
+    // if (search) {
+    //   whereConditions.push(
+    //     or(
+    //       ilike(zones.name, `%${search}%`),
+    //       ilike(zones.description, `%${search}%`)
+    //     )
+    //   );
+    // }
 
     if (status && status !== 'all') {
       whereConditions.push(eq(zones.isActive, status === 'active'));

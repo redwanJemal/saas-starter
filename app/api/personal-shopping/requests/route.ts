@@ -2,9 +2,27 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
-import { personalShopperRequests, personalShopperRequestItems, personalShopperRequestStatusHistory } from '@/lib/db/schema';
+import { 
+  personalShopperRequests, 
+  personalShopperRequestItems, 
+  personalShopperRequestStatusHistory 
+} from '@/lib/db/schema';
 import { getUserWithProfile } from '@/lib/db/queries';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
+
+// Define valid statuses based on your schema
+const validStatuses = [
+  'draft',
+  'submitted',
+  'processing',
+  'quoted',
+  'approved',
+  'purchased',
+  'shipped',
+  'delivered',
+  'cancelled',
+  'completed'
+] as const;
 
 // Generate request number
 function generateRequestNumber(): string {
@@ -23,9 +41,20 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '20');
-    const status = searchParams.get('status');
+    const statusParam = searchParams.get('status');
 
-    let query = db
+    // Build conditions array
+    const conditions = [
+      eq(personalShopperRequests.customerProfileId, userWithProfile.customerProfile.id)
+    ];
+
+    // Validate and add status condition if valid
+    if (statusParam && validStatuses.includes(statusParam as any)) {
+      conditions.push(eq(personalShopperRequests.status, statusParam as any));
+    }
+
+    // Execute query with all conditions
+    const requests = await db
       .select({
         id: personalShopperRequests.id,
         requestNumber: personalShopperRequests.requestNumber,
@@ -45,15 +74,9 @@ export async function GET(request: NextRequest) {
         updatedAt: personalShopperRequests.updatedAt,
       })
       .from(personalShopperRequests)
-      .where(eq(personalShopperRequests.customerProfileId, userWithProfile.customerProfile.id))
+      .where(and(...conditions))
       .orderBy(desc(personalShopperRequests.createdAt))
       .limit(limit);
-
-    if (status) {
-      query = query.where(eq(personalShopperRequests.status, status as any));
-    }
-
-    const requests = await query;
 
     return NextResponse.json({ requests });
   } catch (error) {
@@ -116,7 +139,7 @@ export async function POST(request: NextRequest) {
         shippingPreference: body.shipping?.preference || 'send_together',
         allowAlternateRetailers: body.allow_alternate_retailers ?? true,
         specialInstructions: body.special_instructions,
-        currencyCode: 'USD', // Default currency, could be made configurable
+        currencyCode: 'USD', // Default currency
       })
       .returning();
 
@@ -144,7 +167,9 @@ export async function POST(request: NextRequest) {
       .values({
         personalShopperRequestId: newRequest.id,
         status,
-        notes: status === 'draft' ? 'Request saved as draft' : 'Request submitted for review',
+        notes: status === 'draft' 
+          ? 'Request saved as draft' 
+          : 'Request submitted for review',
         changedBy: userWithProfile.id,
         changeReason: 'Initial creation',
       });

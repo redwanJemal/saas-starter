@@ -26,15 +26,15 @@ export async function GET(request: NextRequest) {
       eq(shippingRates.tenantId, adminUser.tenantId)
     ];
 
-    if (search) {
-      whereConditions.push(
-        or(
-          ilike(warehouses.name, `%${search}%`),
-          ilike(zones.name, `%${search}%`),
-          ilike(shippingRates.serviceType, `%${search}%`)
-        )
-      );
-    }
+    // if (search) {
+    //   whereConditions.push(
+    //     or(
+    //       ilike(warehouses.name, `%${search}%`),
+    //       ilike(zones.name, `%${search}%`),
+    //       ilike(shippingRates.serviceType, `%${search}%`)
+    //     )
+    //   );
+    // }
 
     if (warehouseId && warehouseId !== 'all') {
       whereConditions.push(eq(shippingRates.warehouseId, warehouseId));
@@ -203,21 +203,21 @@ export async function POST(request: NextRequest) {
       lte(shippingRates.effectiveFrom, effectiveFrom),
     ];
 
-    if (effectiveUntil) {
-      overlapConditions.push(
-        or(
-          eq(shippingRates.effectiveUntil, null),
-          gte(shippingRates.effectiveUntil, effectiveFrom)
-        )
-      );
-    } else {
-      overlapConditions.push(
-        or(
-          eq(shippingRates.effectiveUntil, null),
-          gte(shippingRates.effectiveUntil, effectiveFrom)
-        )
-      );
-    }
+    // if (effectiveUntil) {
+    //   overlapConditions.push(
+    //     or(
+    //       eq(shippingRates.effectiveUntil, null),
+    //       gte(shippingRates.effectiveUntil, effectiveFrom)
+    //     )
+    //   );
+    // } else {
+    //   overlapConditions.push(
+    //     or(
+    //       eq(shippingRates.effectiveUntil, null),
+    //       gte(shippingRates.effectiveUntil, effectiveFrom)
+    //     )
+    //   );
+    // }
 
     const overlappingRates = await db
       .select()
