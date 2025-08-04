@@ -16,17 +16,18 @@ import {
 } from '@/lib/db/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 import { requirePermission } from '@/lib/auth/admin';
+import { RouteContext } from '@/lib/utils/route';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     await requirePermission('packages.read');
     
     // Properly await params before using
-    const packageId = params.id;
+    const packageId = (await RouteContext.params).id;
 
     // Get package details with enhanced relationships - optimized query
     const [packageDetails] = await db
@@ -227,14 +228,14 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  RouteContext: RouteContext<{ id: string }>
 ) {
   try {
     // Check permission
     const adminUser = await requirePermission('packages.update');
     
     // Properly await params before using
-    const packageId = params.id;
+    const packageId = (await RouteContext.params).id;
     const body = await request.json();
 
     // Check if package exists
