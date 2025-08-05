@@ -1,15 +1,28 @@
 // lib/services/documentUploadService.ts
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { db } from '@/lib/db/drizzle';
 import { documents, temporaryDocuments, packageDocuments } from '@/lib/db/schema';
 import { eq, and, lt } from 'drizzle-orm';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Create a function to get the Supabase client only when needed
+let supabaseServiceInstance: SupabaseClient | null = null;
 
-const supabaseService = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: { persistSession: false, autoRefreshToken: false }
-});
+function getSupabaseService(): SupabaseClient {
+  if (!supabaseServiceInstance) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase configuration. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
+    }
+    
+    supabaseServiceInstance = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+  }
+  
+  return supabaseServiceInstance;
+}
 
 export interface DocumentUploadResult {
   success: boolean;
@@ -69,6 +82,7 @@ export class DocumentUploadService {
       await this.ensureBucketExists(bucket, isPublic);
 
       // Upload to Supabase storage
+      const supabaseService = getSupabaseService();
       const { data, error } = await supabaseService.storage
         .from(bucket)
         .upload(filePath, file, {
@@ -84,7 +98,7 @@ export class DocumentUploadService {
       // Get file URL
       let fileUrl: string;
       if (isPublic && bucket === this.publicBucket) {
-        const { data: publicData } = supabaseService.storage
+        const { data: publicData } = getSupabaseService().storage
           .from(bucket)
           .getPublicUrl(filePath);
         fileUrl = publicData.publicUrl;
@@ -343,7 +357,7 @@ export class DocumentUploadService {
       }
 
       // Delete from storage
-      const { error: storageError } = await supabaseService.storage
+      const { error: storageError } = await getSupabaseService().storage
         .from(document.bucket)
         .remove([document.filePath]);
 
@@ -397,6 +411,7 @@ export class DocumentUploadService {
 
   private async ensureBucketExists(bucketName: string, isPublic: boolean = true): Promise<boolean> {
     try {
+      const supabaseService = getSupabaseService();
       const { data: buckets, error: listError } = await supabaseService.storage.listBuckets();
       if (listError) return false;
 
