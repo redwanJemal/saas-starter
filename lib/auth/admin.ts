@@ -35,7 +35,7 @@ export async function getAdminUser(): Promise<AdminUser | null> {
   }
 
   // Get user roles and permissions
-  const userWithRoles = await db.query.users.findFirst({
+  const userWithRoles = await (db as any).query.users.findFirst({
     where: eq(users.id, user.id),
     with: {
       userRoles: {
@@ -65,12 +65,12 @@ export async function getAdminUser(): Promise<AdminUser | null> {
     firstName: user.firstName,
     lastName: user.lastName,
     userType: user.userType as 'admin' | 'staff',
-    roles: userWithRoles.userRoles.map(ur => ({
+    roles: userWithRoles.userRoles.map((ur: any) => ({
       id: ur.role.id,
       name: ur.role.name,
       slug: ur.role.slug,
       roleType: ur.role.roleType,
-      permissions: ur.role.rolePermissions.map(rp => ({
+      permissions: ur.role.rolePermissions.map((rp: any) => ({
         id: rp.permission.id,
         name: rp.permission.name,
         slug: rp.permission.slug,

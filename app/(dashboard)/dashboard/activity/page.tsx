@@ -179,7 +179,7 @@ export default async function ActivityPage() {
         <CardContent>
           {logs.length > 0 ? (
             <div className="space-y-4">
-              {logs.map((log) => {
+              {logs.map((log: any) => {
                 const Icon = iconMap[log.action] || iconMap.DEFAULT;
                 const formattedAction = formatAction(log.action);
                 const colorClass = getActivityColor(log.action);

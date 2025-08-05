@@ -186,11 +186,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify customer exists
-    const customer = await db.query.customerProfiles.findFirst({
-      where: eq(customerProfiles.id, customerProfileId),
-    });
+    const customer = await db
+    .select({ id: customerProfiles.id })
+    .from(customerProfiles)
+    .where(eq(customerProfiles.id, customerProfileId))
+    .limit(1);
 
-    if (!customer) {
+    if (customer.length === 0) {
       return NextResponse.json(
         { error: 'Customer not found' },
         { status: 404 }
@@ -198,11 +200,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify warehouse exists
-    const warehouse = await db.query.warehouses.findFirst({
-      where: eq(warehouses.id, warehouseId),
-    });
+    const warehouse = await db
+    .select({ id: warehouses.id })
+    .from(warehouses)
+    .where(eq(warehouses.id, warehouseId))
+    .limit(1);
 
-    if (!warehouse) {
+    if (warehouse.length === 0) {
       return NextResponse.json(
         { error: 'Warehouse not found' },
         { status: 404 }

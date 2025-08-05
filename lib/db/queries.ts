@@ -58,7 +58,7 @@ export async function getUserWithProfile() {
     return null;
   }
 
-  const result = await db.query.users.findFirst({
+  const result = await (db as any).query.users.findFirst({
     where: eq(users.id, user.id),
     with: {
       customerProfile: {
@@ -79,7 +79,7 @@ export async function getUserWithProfile() {
 
 // Get customer profile by user ID
 export async function getCustomerProfile(userId: string) {
-  const result = await db.query.customerProfiles.findFirst({
+  const result = await (db as any).query.customerProfiles.findFirst({
     where: eq(customerProfiles.userId, userId),
     with: {
       user: {
@@ -106,7 +106,7 @@ export async function getCustomerProfile(userId: string) {
 
 // Get packages for customer
 export async function getCustomerPackages(customerProfileId: string, limit = 10) {
-  return await db.query.packages.findMany({
+  return await (db as any).query.packages.findMany({
     where: eq(packages.customerProfileId, customerProfileId),
     with: {
       warehouse: {
@@ -130,7 +130,7 @@ export async function getCustomerPackages(customerProfileId: string, limit = 10)
 
 // Get shipments for customer
 export async function getCustomerShipments(customerProfileId: string, limit = 10) {
-  return await db.query.shipments.findMany({
+  return await (db as any).query.shipments.findMany({
     where: eq(shipments.customerProfileId, customerProfileId),
     with: {
       warehouse: {
@@ -160,7 +160,7 @@ export async function getCustomerShipments(customerProfileId: string, limit = 10
 
 // Get virtual addresses for customer
 export async function getCustomerVirtualAddresses(customerProfileId: string) {
-  return await db.query.customerWarehouseAssignments.findMany({
+  return await (db as any).query.customerWarehouseAssignments.findMany({
     where: and(
       eq(customerWarehouseAssignments.customerProfileId, customerProfileId),
       eq(customerWarehouseAssignments.status, 'active')
@@ -183,7 +183,7 @@ export async function getActivityLogs() {
     return [];
   }
 
-  return await db
+  return await (db as any)
     .select({
       id: activityLogs.id,
       action: activityLogs.action,
@@ -204,7 +204,7 @@ export async function getActivityLogs() {
 
 // Get default tenant
 export async function getDefaultTenant() {
-  const result = await db.query.tenants.findFirst({
+  const result = await (db as any).query.tenants.findFirst({
     where: eq(tenants.slug, DEFAULT_TENANT_SLUG)
   });
   return result || null;
@@ -213,26 +213,26 @@ export async function getDefaultTenant() {
 // Get customer dashboard stats
 export async function getCustomerDashboardStats(customerProfileId: string) {
   const [packagesResult, shipmentsResult, addressesResult] = await Promise.all([
-    db.query.packages.findMany({
+    (db as any).query.packages.findMany({
       where: eq(packages.customerProfileId, customerProfileId),
       columns: { status: true }
     }),
-    db.query.shipments.findMany({
+    (db as any).query.shipments.findMany({
       where: eq(shipments.customerProfileId, customerProfileId),
       columns: { status: true }
     }),
-    db.query.addresses.findMany({
+    (db as any).query.addresses.findMany({
       where: eq(addresses.customerProfileId, customerProfileId),
       columns: { id: true }
     })
   ]);
 
-  const packageStats = packagesResult.reduce((acc, pkg) => {
+  const packageStats = packagesResult.reduce((acc: any, pkg: any) => {
     acc[pkg.status || ''] = (acc[pkg.status || ''] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  const shipmentStats = shipmentsResult.reduce((acc, shipment) => {
+  const shipmentStats = shipmentsResult.reduce((acc: any, shipment: any) => {
     acc[shipment.status || ''] = (acc[shipment.status || ''] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -271,7 +271,7 @@ export async function getTeamForUser() {
 }
 
 export async function getCustomerByStripeCustomerId(stripeCustomerId: string) {
-  const result = await db.query.customerProfiles.findFirst({
+  const result = await (db as any).query.customerProfiles.findFirst({
     where: eq(customerProfiles.stripeCustomerId, stripeCustomerId),
     with: {
       user: true
@@ -290,7 +290,7 @@ export async function updateCustomerSubscription(
     subscriptionStatus?: string;
   }
 ) {
-  await db
+  await (db as any)
     .update(customerProfiles)
     .set({
       ...subscriptionData,

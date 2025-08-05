@@ -7,18 +7,18 @@ import { db } from '@/lib/db/drizzle';
 import { 
   users, 
   customerProfiles, 
-  customerWarehouseAssignments,
-  warehouses,
-  activityLogs,
-  tenants,
-  userRoles,
-  roles,
+  customerWarehouseAssignments, 
+  warehouses, 
+  activityLogs, 
+  tenants, 
+  userRoles, 
+  roles, 
   type NewUser, 
-  type NewCustomerProfile,
-  type NewActivityLog,
-  DEFAULT_TENANT_SLUG,
-  CUSTOMER_ID_PREFIX,
-  CUSTOMER_ID_LENGTH
+  type NewCustomerProfile, 
+  type NewActivityLog, 
+  DEFAULT_TENANT_SLUG, 
+  CUSTOMER_ID_PREFIX, 
+  CUSTOMER_ID_LENGTH 
 } from '@/lib/db/schema';
 import { comparePasswords, hashPassword, setSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
@@ -70,55 +70,91 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
   // Get default tenant
   const tenant = await getDefaultTenant();
   if (!tenant) {
-    return { error: 'System configuration error. Please try again.', email, password };
+    return { error: 'System configuration error. Please try again.' };
   }
 
-  // Find user with customer profile
-  const userWithProfile = await db.query.users.findFirst({
-    where: and(
-      eq(users.email, email),
-      eq(users.tenantId, tenant.id)
-    ),
-    with: {
-      customerProfile: true
-    }
+  // Find user with customer profile - FIXED: Use direct select instead of query
+  const userWithProfile = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      passwordHash: users.passwordHash,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      tenantId: users.tenantId,
+      userType: users.userType,
+      status: users.status,
+      customerProfileId: customerProfiles.id,
+      customerId: customerProfiles.customerId,
+    })
+    .from(users)
+    .leftJoin(customerProfiles, eq(users.id, customerProfiles.userId))
+    .where(
+      and(
+        eq(users.email, email),
+        eq(users.tenantId, tenant.id)
+      )
+    )
+    .limit(1);
+
+  if (userWithProfile.length === 0) {
+    return { error: 'Invalid email or password.' };
+  }
+
+  const user = userWithProfile[0];
+
+  // Verify password
+  const isValidPassword = await comparePasswords(password, user.passwordHash);
+  if (!isValidPassword) {
+    return { error: 'Invalid email or password.' };
+  }
+
+  // Check if user is active
+  if (user.status !== 'active') {
+    return { error: 'Account is not active. Please contact support.' };
+  }
+
+  // Set session - only pass the required fields
+  await setSession({
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
   });
 
-  if (!userWithProfile) {
-    return { error: 'Invalid email or password. Please try again.', email, password };
+  // Log the sign-in activity
+  await logActivity(
+    tenant.id,
+    user.id,
+    user.customerProfileId,
+    'user.sign_in',
+    'User signed in successfully',
+    'authentication'
+  );
+
+  // Check for redirect from cookies or search params
+  const cookieStore = await cookies();
+  const redirectCookie = cookieStore.get('redirectAfterLogin');
+  
+  if (redirectCookie) {
+    cookieStore.delete('redirectAfterLogin');
+    redirect(redirectCookie.value);
   }
 
-  const isPasswordValid = await comparePasswords(password, userWithProfile.passwordHash);
-  if (!isPasswordValid) {
-    return { error: 'Invalid email or password. Please try again.', email, password };
+  // Check if user has customer profile
+  if (!user.customerProfileId) {
+    redirect('/dashboard/general'); // Redirect to complete profile
   }
-
-  await Promise.all([
-    setSession({
-      id: userWithProfile.id,
-      email: userWithProfile.email,
-      firstName: userWithProfile.firstName,
-      lastName: userWithProfile.lastName
-    }),
-    logActivity(
-      tenant.id,
-      userWithProfile.id,
-      userWithProfile.customerProfile?.id || null,
-      'SIGN_IN',
-      'User signed in',
-      'authentication'
-    )
-  ]);
 
   redirect('/dashboard');
 });
 
 const signUpSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  firstName: z.string().min(1).max(100).optional(),
-  lastName: z.string().min(1).max(100).optional(),
-  phone: z.string().max(50).optional()
+  email: z.string().email().min(3).max(255),
+  password: z.string().min(8).max(100),
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  phone: z.string().min(10).max(20).optional()
 });
 
 export const signUp = validatedAction(signUpSchema, async (data, formData) => {
@@ -127,21 +163,26 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
   // Get default tenant
   const tenant = await getDefaultTenant();
   if (!tenant) {
-    return { error: 'System configuration error. Please try again.', email, password };
+    return { error: 'System configuration error. Please try again.' };
   }
 
   // Check if user already exists
-  const existingUser = await db.query.users.findFirst({
-    where: and(
-      eq(users.email, email),
-      eq(users.tenantId, tenant.id)
+  const existingUser = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(
+        eq(users.email, email),
+        eq(users.tenantId, tenant.id)
+      )
     )
-  });
+    .limit(1);
 
-  if (existingUser) {
-    return { error: 'An account with this email already exists.', email, password };
+  if (existingUser.length > 0) {
+    return { error: 'User with this email already exists.' };
   }
 
+  // Hash password
   const passwordHash = await hashPassword(password);
 
   // Create user
@@ -151,278 +192,203 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     passwordHash,
     firstName,
     lastName,
-    phone,
+    phone: phone || null,
     userType: 'customer',
-    status: 'active',
-    emailVerifiedAt: new Date() // Auto-verify for now
+    status: 'active'
   };
 
-  const [createdUser] = await db.insert(users).values(newUser).returning();
-  if (!createdUser) {
-    return { error: 'Failed to create account. Please try again.', email, password };
-  }
-
-  // Generate unique customer ID
-  let customerId = generateCustomerId();
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  while (attempts < maxAttempts) {
-    const existing = await db.query.customerProfiles.findFirst({
-      where: eq(customerProfiles.customerId, customerId)
-    });
-
-    if (!existing) break;
-    
-    customerId = generateCustomerId();
-    attempts++;
-  }
-
-  if (attempts >= maxAttempts) {
-    return { error: 'Failed to generate unique customer ID. Please try again.', email, password };
-  }
+  const createdUsers = await db.insert(users).values(newUser).returning();
+  const createdUser = createdUsers[0];
 
   // Create customer profile
   const newCustomerProfile: NewCustomerProfile = {
-    userId: createdUser.id,
     tenantId: tenant.id,
-    customerId,
-    kycStatus: 'not_required',
-    riskLevel: 'low'
+    userId: createdUser.id,
+    customerId: generateCustomerId(),
+    kycStatus: 'not_required'
   };
 
-  const [createdProfile] = await db.insert(customerProfiles).values(newCustomerProfile).returning();
-  if (!createdProfile) {
-    return { error: 'Failed to create customer profile. Please try again.', email, password };
-  }
+  const createdProfiles = await db.insert(customerProfiles).values(newCustomerProfile).returning();
+  const createdProfile = createdProfiles[0];
 
-  // Assign customer role
-  const customerRole = await db.query.roles.findFirst({
-    where: and(
-      eq(roles.tenantId, tenant.id),
-      eq(roles.slug, 'customer')
-    )
+  // Log the sign-up activity
+  await logActivity(
+    tenant.id,
+    createdUser.id,
+    createdProfile.id,
+    'user.sign_up',
+    'User account created successfully',
+    'user'
+  );
+
+  // Set session - only pass the required fields
+  await setSession({
+    id: createdUser.id,
+    email: createdUser.email,
+    firstName: createdUser.firstName,
+    lastName: createdUser.lastName,
   });
-
-  if (customerRole) {
-    await db.insert(userRoles).values({
-      userId: createdUser.id,
-      roleId: customerRole.id
-    });
-  }
-
-  // Assign to default warehouse (UK1)
-  const defaultWarehouse = await db.query.warehouses.findFirst({
-    where: and(
-      eq(warehouses.tenantId, tenant.id),
-      eq(warehouses.code, 'UK1')
-    )
-  });
-
-  if (defaultWarehouse) {
-    await db.insert(customerWarehouseAssignments).values({
-      customerProfileId: createdProfile.id,
-      warehouseId: defaultWarehouse.id,
-      suiteCode: customerId,
-      status: 'active',
-      assignedBy: createdUser.id
-    });
-  }
-
-  await Promise.all([
-    setSession({
-      id: createdUser.id,
-      email: createdUser.email,
-      firstName: createdUser.firstName,
-      lastName: createdUser.lastName
-    }),
-    logActivity(
-      tenant.id,
-      createdUser.id,
-      createdProfile.id,
-      'SIGN_UP',
-      'Customer account created',
-      'customer_profile',
-      createdProfile.id
-    )
-  ]);
 
   redirect('/dashboard');
 });
 
-export async function signOut() {
-  const user = await getUser();
-  if (!user) {
-    redirect('/sign-in');
-    return;
+const updateAccountSchema = z.object({
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  email: z.string().email().min(3).max(255),
+  phone: z.string().min(10).max(20).optional()
+});
+
+export const updateAccount = validatedActionWithUser(updateAccountSchema, async (data, formData, user) => {
+  const { firstName, lastName, email, phone } = data;
+
+  // Check if email is being changed and if it's already taken
+  if (email !== user.email) {
+    const existingUser = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.email, email),
+          eq(users.tenantId, user.tenantId)
+        )
+      )
+      .limit(1);
+
+    if (existingUser.length > 0) {
+      return { error: 'Email is already taken.' };
+    }
   }
 
+  // Update user
+  await db
+    .update(users)
+    .set({
+      firstName,
+      lastName,
+      email,
+      phone: phone || null,
+      updatedAt: new Date()
+    })
+    .where(eq(users.id, user.id));
+
+  // Get user with profile for activity logging
   const userWithProfile = await getUserWithProfile();
-  const tenant = await getDefaultTenant();
+  
+  // Log the update activity
+  await logActivity(
+    user.tenantId,
+    user.id,
+    userWithProfile?.customerProfile?.id || null,
+    'user.update_profile',
+    'User profile updated successfully',
+    'user'
+  );
 
-  if (tenant && userWithProfile?.customerProfile) {
-    await logActivity(
-      tenant.id,
-      user.id,
-      userWithProfile.customerProfile.id,
-      'SIGN_OUT',
-      'User signed out',
-      'authentication'
-    );
-  }
-
-  (await cookies()).delete('session');
-  redirect('/sign-in');
-}
+  return { success: 'Account updated successfully.' };
+});
 
 const updatePasswordSchema = z.object({
   currentPassword: z.string().min(8).max(100),
   newPassword: z.string().min(8).max(100),
   confirmPassword: z.string().min(8).max(100)
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "New passwords don't match",
+  path: ["confirmPassword"]
+});
+
+// Schema for account deletion
+const deleteAccountSchema = z.object({
+  password: z.string().min(8).max(100),
+  confirmation: z.string().refine((val) => val === "DELETE", {
+    message: "Please type DELETE to confirm"
+  })
 });
 
 export const updatePassword = validatedActionWithUser(
   updatePasswordSchema,
-  async (data, _, user) => {
-    const { currentPassword, newPassword, confirmPassword } = data;
+  async (data, formData, user) => {
+    const { currentPassword, newPassword } = data;
 
-    const isPasswordValid = await comparePasswords(currentPassword, user.passwordHash);
-    if (!isPasswordValid) {
-      return { 
-        currentPassword, 
-        newPassword, 
-        confirmPassword, 
-        error: 'Current password is incorrect.' 
-      };
+    // Verify current password
+    const isValidPassword = await comparePasswords(currentPassword, user.passwordHash);
+    if (!isValidPassword) {
+      return { error: 'Current password is incorrect.' };
     }
 
-    if (currentPassword === newPassword) {
-      return { 
-        currentPassword, 
-        newPassword, 
-        confirmPassword, 
-        error: 'New password must be different from the current password.' 
-      };
-    }
+    // Hash new password
+    const hashedNewPassword = await hashPassword(newPassword);
 
-    if (confirmPassword !== newPassword) {
-      return { 
-        currentPassword, 
-        newPassword, 
-        confirmPassword, 
-        error: 'New password and confirmation password do not match.' 
-      };
-    }
+    // Update password in database
+    await db
+      .update(users)
+      .set({ 
+        passwordHash: hashedNewPassword,
+        updatedAt: new Date() 
+      })
+      .where(eq(users.id, user.id));
 
-    const newPasswordHash = await hashPassword(newPassword);
+    // Get user with profile for activity logging
     const userWithProfile = await getUserWithProfile();
-    const tenant = await getDefaultTenant();
 
-    await Promise.all([
-      db.update(users)
-        .set({ passwordHash: newPasswordHash, updatedAt: new Date() })
-        .where(eq(users.id, user.id)),
-      tenant && userWithProfile?.customerProfile && logActivity(
-        tenant.id,
-        user.id,
-        userWithProfile.customerProfile.id,
-        'PASSWORD_CHANGED',
-        'Password updated',
-        'user_security'
-      )
-    ]);
+    // Log the password change activity
+    await logActivity(
+      user.tenantId,
+      user.id,
+      userWithProfile?.customerProfile?.id || null,
+      'PASSWORD_CHANGED',
+      'User password updated successfully',
+      'user'
+    );
 
     return { success: 'Password updated successfully.' };
   }
 );
 
-const updateAccountSchema = z.object({
-  firstName: z.string().min(1, 'First name is required').max(100),
-  lastName: z.string().min(1, 'Last name is required').max(100),
-  email: z.string().email('Invalid email address'),
-  phone: z.string().max(50).optional()
-});
-
-export const updateAccount = validatedActionWithUser(
-  updateAccountSchema,
-  async (data, _, user) => {
-    const { firstName, lastName, email, phone } = data;
-
-    // Check if email is already taken by another user
-    if (email !== user.email) {
-      const existingUser = await db.query.users.findFirst({
-        where: and(
-          eq(users.email, email),
-          eq(users.tenantId, user.tenantId)
-        )
-      });
-
-      if (existingUser && existingUser.id !== user.id) {
-        return { error: 'Email address is already in use.' };
-      }
-    }
-
-    const userWithProfile = await getUserWithProfile();
-    const tenant = await getDefaultTenant();
-
-    await Promise.all([
-      db.update(users)
-        .set({ firstName, lastName, email, phone, updatedAt: new Date() })
-        .where(eq(users.id, user.id)),
-      tenant && userWithProfile?.customerProfile && logActivity(
-        tenant.id,
-        user.id,
-        userWithProfile.customerProfile.id,
-        'PROFILE_UPDATED',
-        'Profile information updated',
-        'customer_profile',
-        userWithProfile.customerProfile.id
-      )
-    ]);
-
-    return { firstName, lastName, email, phone, success: 'Account updated successfully.' };
-  }
-);
-
-const deleteAccountSchema = z.object({
-  password: z.string().min(8).max(100)
-});
-
 export const deleteAccount = validatedActionWithUser(
   deleteAccountSchema,
-  async (data, _, user) => {
+  async (data, formData, user) => {
     const { password } = data;
 
-    const isPasswordValid = await comparePasswords(password, user.passwordHash);
-    if (!isPasswordValid) {
-      return { password, error: 'Incorrect password. Account deletion failed.' };
+    // Verify password
+    const isValidPassword = await comparePasswords(password, user.passwordHash);
+    if (!isValidPassword) {
+      return { error: 'Password is incorrect.' };
     }
 
+    // Get user profile for cleanup
     const userWithProfile = await getUserWithProfile();
-    const tenant = await getDefaultTenant();
 
-    if (tenant && userWithProfile?.customerProfile) {
-      await logActivity(
-        tenant.id,
-        user.id,
-        userWithProfile.customerProfile.id,
-        'ACCOUNT_DELETED',
-        'Customer account deleted',
-        'customer_profile',
-        userWithProfile.customerProfile.id
-      );
-    }
-
-    // Soft delete user
-    await db.update(users)
+    // Soft delete user (set deletedAt timestamp)
+    await db
+      .update(users)
       .set({ 
         deletedAt: new Date(),
-        email: `${user.email}-${user.id}-deleted`, // Ensure email uniqueness
         updatedAt: new Date()
       })
       .where(eq(users.id, user.id));
 
-    (await cookies()).delete('session');
-    redirect('/sign-in');
+    // Log the account deletion activity
+    await logActivity(
+      user.tenantId,
+      user.id,
+      userWithProfile?.customerProfile?.id || null,
+      'ACCOUNT_DELETED',
+      'User account deleted by user request',
+      'user'
+    );
+
+    // Clear session
+    const cookieStore = await cookies();
+    cookieStore.delete('session');
+
+    // Redirect will be handled by the component
+    return { success: 'Account deleted successfully.' };
   }
 );
+
+export async function signOut() {
+  const cookieStore = await cookies();
+  cookieStore.delete('session');
+  redirect('/sign-in');
+}

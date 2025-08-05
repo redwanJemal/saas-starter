@@ -1,23 +1,20 @@
 // app/api/admin/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { requireAdminUser } from '@/lib/auth/admin';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-// Create service client that bypasses RLS
-const supabaseService = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false
-  }
-});
+import { isSupabaseConfigured, getSupabaseService } from '@/lib/supabase/client';
 
 export async function POST(request: NextRequest) {
   try {
     // Check admin authentication
     await requireAdminUser();
+
+    // Check if Supabase is configured
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json(
+        { error: 'File upload service not configured' },
+        { status: 503 }
+      );
+    }
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -33,10 +30,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg', 
+      'image/png',
+      'image/webp',
+      'application/pdf'
+    ];
+    
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Invalid file type' },
+        { error: 'Invalid file type. Only images and PDFs are allowed.' },
         { status: 400 }
       );
     }
@@ -44,7 +48,7 @@ export async function POST(request: NextRequest) {
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: 'File too large' },
+        { error: 'File too large. Maximum size is 10MB.' },
         { status: 400 }
       );
     }
@@ -56,23 +60,24 @@ export async function POST(request: NextRequest) {
     const fileName = `${timestamp}-${randomString}.${extension}`;
     const filePath = `${path}/${fileName}`;
 
+    // Get Supabase service client
+    const supabaseService = getSupabaseService();
+
     // Ensure bucket exists
-    const { data: buckets } = await supabaseService.storage.listBuckets();
-    const bucketExists = buckets?.some(b => b.id === bucket);
-
-    if (!bucketExists) {
-      const { error: createError } = await supabaseService.storage.createBucket(bucket, {
-        public: isPublic,
-        fileSizeLimit: 52428800,
-        allowedMimeTypes: allowedTypes
-      });
-
-      if (createError && !createError.message.includes('already exists')) {
-        console.error('Error creating bucket:', createError);
-        return NextResponse.json(
-          { error: 'Failed to create storage bucket' },
-          { status: 500 }
-        );
+    const { data: buckets, error: listError } = await supabaseService.storage.listBuckets();
+    if (listError) {
+      console.error('Error listing buckets:', listError);
+    } else {
+      const bucketExists = buckets?.some(b => b.id === bucket);
+      if (!bucketExists) {
+        const { error: createError } = await supabaseService.storage.createBucket(bucket, {
+          public: isPublic,
+          fileSizeLimit: 52428800, // 50MB
+          allowedMimeTypes: allowedTypes
+        });
+        if (createError) {
+          console.error('Error creating bucket:', createError);
+        }
       }
     }
 
@@ -81,13 +86,13 @@ export async function POST(request: NextRequest) {
       .from(bucket)
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: false
+        upsert: false,
       });
 
     if (error) {
-      console.error('Upload error:', error);
+      console.error('Supabase upload error:', error);
       return NextResponse.json(
-        { error: error.message },
+        { error: 'Failed to upload file' },
         { status: 500 }
       );
     }
@@ -100,17 +105,20 @@ export async function POST(request: NextRequest) {
         .getPublicUrl(filePath);
       fileUrl = publicData.publicUrl;
     } else {
-      fileUrl = filePath; // Return path for private files
+      // For private files, return path - will need signed URL later
+      fileUrl = filePath;
     }
 
     return NextResponse.json({
       success: true,
       fileUrl,
-      fileName: data.path
+      fileName: data.path,
+      fileSize: file.size,
+      mimeType: file.type,
     });
 
   } catch (error) {
-    console.error('Upload API error:', error);
+    console.error('Error uploading file:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

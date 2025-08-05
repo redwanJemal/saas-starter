@@ -30,7 +30,7 @@ export async function signInAdmin(
     const { email, password, redirect } = validatedData;
 
     // Find admin/staff user
-    const existingUser = await db.query.users.findFirst({
+    const existingUser = await (db as any).query.users.findFirst({
       where: and(
         eq(users.email, email),
         isNull(users.deletedAt)

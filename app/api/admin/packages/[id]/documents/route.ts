@@ -1,221 +1,127 @@
-// app/api/admin/packages/[id]/documents/route.ts
+// app/api/admin/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db/drizzle';
-import { packages, packageDocuments, documents } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
 import { requireAdminUser } from '@/lib/auth/admin';
-import { DocumentUploadService } from '@/lib/services/documentUploadService';
+import { isSupabaseConfigured, getSupabaseService } from '@/lib/supabase/client';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest) {
   try {
-    // Check authentication and admin role
-    const adminUser = await requireAdminUser();
-    
-    // Await params
-    const { id: packageId } = await params;
-    
-    const body = await request.json();
-    console.log('Received payload:', body);
+    // Check admin authentication
+    await requireAdminUser();
 
-    // Handle different payload formats
-    let documentIds: string[] = [];
-    let sessionId = '';
-    let documentType = 'picture';
-
-    if (body.sessionId) {
-      // New format: convert temporary documents to package documents
-      sessionId = body.sessionId;
-      documentType = body.documentType || 'picture';
-      
-      const uploadService = new DocumentUploadService();
-      const result = await uploadService.convertTemporaryToPackageDocuments(
-        sessionId,
-        packageId,
-        documentType,
-        adminUser.id
-      );
-
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error },
-          { status: 400 }
-        );
-      }
-
-      // Get the attached documents
-      const attachedDocuments = await db
-        .select({
-          id: packageDocuments.id,
-          documentType: packageDocuments.documentType,
-          fileName: documents.fileName,
-          fileUrl: documents.fileUrl,
-          fileSize: documents.fileSize,
-          mimeType: documents.mimeType,
-          isPublic: documents.isPublic,
-          uploadedAt: documents.uploadedAt,
-        })
-        .from(packageDocuments)
-        .innerJoin(documents, eq(packageDocuments.documentId, documents.id))
-        .where(
-          and(
-            eq(packageDocuments.packageId, packageId),
-            eq(packageDocuments.documentType, documentType)
-          )
-        );
-
-      return NextResponse.json({
-        success: true,
-        documents: attachedDocuments,
-        message: `${result.documentCount} document(s) attached successfully`,
-      });
-
-    } else if (body.documentIds && Array.isArray(body.documentIds)) {
-      // Direct document ID attachment
-      documentIds = body.documentIds;
-      documentType = body.documentType || 'picture';
-
-      const uploadService = new DocumentUploadService();
-      const result = await uploadService.attachDocumentsToPackage(
-        packageId,
-        documentIds,
-        documentType,
-        adminUser.id
-      );
-
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error },
-          { status: 400 }
-        );
-      }
-
-      // Get the attached documents
-      const attachedDocuments = await db
-        .select({
-          id: packageDocuments.id,
-          documentType: packageDocuments.documentType,
-          fileName: documents.fileName,
-          fileUrl: documents.fileUrl,
-          fileSize: documents.fileSize,
-          mimeType: documents.mimeType,
-          isPublic: documents.isPublic,
-          uploadedAt: documents.uploadedAt,
-        })
-        .from(packageDocuments)
-        .innerJoin(documents, eq(packageDocuments.documentId, documents.id))
-        .where(eq(packageDocuments.packageId, packageId));
-
-      return NextResponse.json({
-        success: true,
-        documents: attachedDocuments,
-        message: `${documentIds.length} document(s) attached successfully`,
-      });
-
-    } else {
-      // Legacy format: direct document upload (deprecated but supported)
-      const documentsPayload = Array.isArray(body) ? body : body.documents;
-      
-      if (!documentsPayload || !Array.isArray(documentsPayload)) {
-        return NextResponse.json(
-          { error: 'Invalid payload format. Use sessionId or documentIds.' },
-          { status: 400 }
-        );
-      }
-
-      // Verify package exists
-      const [existingPackage] = await db
-        .select({ id: packages.id })
-        .from(packages)
-        .where(eq(packages.id, packageId))
-        .limit(1);
-
-      if (!existingPackage) {
-        return NextResponse.json(
-          { error: 'Package not found' },
-          { status: 404 }
-        );
-      }
-
-      // This is legacy support - create documents and attach them directly
-      // In production, you should phase this out in favor of the new flow
+    // Check if Supabase is configured
+    if (!isSupabaseConfigured()) {
       return NextResponse.json(
-        { error: 'Legacy upload format is deprecated. Please use the new document upload flow.' },
+        { error: 'File upload service not configured' },
+        { status: 503 }
+      );
+    }
+
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    const bucket = formData.get('bucket') as string || 'uktoeast-public';
+    const path = formData.get('path') as string || 'packages';
+    const isPublic = formData.get('isPublic') === 'true';
+
+    if (!file) {
+      return NextResponse.json(
+        { error: 'No file provided' },
         { status: 400 }
       );
     }
 
-  } catch (error) {
-    console.error('Error managing package documents:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to manage package documents',
-        details: process.env.NODE_ENV === 'development' ? 
-          (error instanceof Error ? error.message : String(error)) : undefined
-      },
-      { status: 500 }
-    );
-  }
-}
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    // Check authentication and admin role
-    await requireAdminUser();
-
-    // Await params
-    const { id: packageId } = await params;
-    const { searchParams } = new URL(request.url);
-    const documentType = searchParams.get('type');
-
-    // Build query with joins
-    const baseQuery = db
-      .select({
-        id: packageDocuments.id,
-        documentType: packageDocuments.documentType,
-        isPrimary: packageDocuments.isPrimary,
-        displayOrder: packageDocuments.displayOrder,
-        attachedAt: packageDocuments.attachedAt,
-        // Document details
-        documentId: documents.id,
-        fileName: documents.fileName,
-        originalFileName: documents.originalFileName,
-        fileUrl: documents.fileUrl,
-        fileSize: documents.fileSize,
-        mimeType: documents.mimeType,
-        isPublic: documents.isPublic,
-        uploadedAt: documents.uploadedAt,
-      })
-      .from(packageDocuments)
-      .innerJoin(documents, eq(packageDocuments.documentId, documents.id));
-      
-    // Apply filters
-    let packageDocs;
-    if (documentType) {
-      packageDocs = await baseQuery.where(
-        and(
-          eq(packageDocuments.packageId, packageId),
-          eq(packageDocuments.documentType, documentType)
-        )
+    // Validate file
+    const allowedTypes = [
+      'image/jpeg', 
+      'image/jpg', 
+      'image/png', 
+      'image/webp', 
+      'application/pdf'
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Invalid file type. Only images and PDFs are allowed.' },
+        { status: 400 }
       );
+    }
+
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      return NextResponse.json(
+        { error: 'File too large. Maximum size is 10MB.' },
+        { status: 400 }
+      );
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2);
+    const extension = file.name.split('.').pop() || 'jpg';
+    const fileName = `${timestamp}-${randomString}.${extension}`;
+    const filePath = `${path}/${fileName}`;
+
+    // Get Supabase service client
+    const supabaseService = getSupabaseService();
+
+    // Ensure bucket exists
+    const { data: buckets, error: listError } = await supabaseService.storage.listBuckets();
+    if (listError) {
+      console.error('Error listing buckets:', listError);
     } else {
-      packageDocs = await baseQuery.where(eq(packageDocuments.packageId, packageId));
+      const bucketExists = buckets?.some(b => b.id === bucket);
+      if (!bucketExists) {
+        const { error: createError } = await supabaseService.storage.createBucket(bucket, {
+          public: isPublic,
+          fileSizeLimit: 52428800, // 50MB
+          allowedMimeTypes: allowedTypes
+        });
+        
+        if (createError) {
+          console.error('Error creating bucket:', createError);
+        }
+      }
+    }
+
+    // Upload file
+    const { data, error } = await supabaseService.storage
+      .from(bucket)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Supabase upload error:', error);
+      return NextResponse.json(
+        { error: 'Failed to upload file' },
+        { status: 500 }
+      );
+    }
+
+    // Get file URL
+    let fileUrl: string;
+    if (isPublic) {
+      const { data: publicData } = supabaseService.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+      fileUrl = publicData.publicUrl;
+    } else {
+      // For private files, return path - will need signed URL later
+      fileUrl = filePath;
     }
 
     return NextResponse.json({
       success: true,
-      documents: packageDocs
+      fileUrl,
+      fileName: data.path,
+      fileSize: file.size,
+      mimeType: file.type,
     });
 
   } catch (error) {
-    console.error('Error fetching package documents:', error);
+    console.error('Error uploading file:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to upload file' },
       { status: 500 }
     );
   }
