@@ -8,7 +8,7 @@ import {
   shipmentPackages,
   packages
 } from '@/lib/db/schema';
-import { stripe } from '@/lib/payments/stripe';
+import { getStripe } from '@/lib/payments/stripe';
 import { StorageFeeCalculator } from '@/lib/services/storage-fee-calculator';
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
@@ -147,45 +147,53 @@ export async function POST(
       : 'International';
 
     // Create Stripe payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(updatedTotalCost * 100), // Convert to cents
-      currency: shipment.costCurrency?.toLowerCase() || 'usd',
-      automatic_payment_methods: {
-        enabled: true,
-      },
-      metadata: {
-        shipmentId: shipment.id,
-        shipmentNumber: shipment.shipmentNumber,
-        customerId: userWithProfile.customerProfile.id,
-        tenantId: userWithProfile.customerProfile.tenantId,
-        originalStorageFee: quotedStorageFee.toString(),
-        updatedStorageFee: currentStorageFee.toString(),
-        storageFeeChanged: storageFeeChange > 1.00 ? 'true' : 'false'
-      },
-      description: `Shipping for ${shipment.shipmentNumber} to ${destination}`,
-      receipt_email: userWithProfile.email,
-    });
+    const stripe = await getStripe();
+    try {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(updatedTotalCost * 100), // Convert to cents
+        currency: shipment.costCurrency?.toLowerCase() || 'usd',
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        metadata: {
+          shipmentId: shipment.id,
+          shipmentNumber: shipment.shipmentNumber,
+          customerId: userWithProfile.customerProfile.id,
+          tenantId: userWithProfile.customerProfile.tenantId,
+          originalStorageFee: quotedStorageFee.toString(),
+          updatedStorageFee: currentStorageFee.toString(),
+          storageFeeChanged: storageFeeChange > 1.00 ? 'true' : 'false'
+        },
+        description: `Shipping for ${shipment.shipmentNumber} to ${destination}`,
+        receipt_email: userWithProfile.email,
+      });
 
-    return NextResponse.json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
-      amount: updatedTotalCost,
-      currency: shipment.costCurrency || 'USD',
-      storageFeeUpdate: storageFeeChange > 1.00 ? {
-        originalFee: quotedStorageFee,
-        updatedFee: currentStorageFee,
-        change: currentStorageFee - quotedStorageFee,
-        reason: 'Storage fees updated based on current storage duration'
-      } : null,
-      storageBreakdown: currentStorageFees.breakdown,
-      shipment: {
-        id: shipment.id,
-        shipmentNumber: shipment.shipmentNumber,
-        destination,
-        packageCount: packageQuery.length
-      },
-    });
-
+      return NextResponse.json({
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: updatedTotalCost,
+        currency: shipment.costCurrency || 'USD',
+        storageFeeUpdate: storageFeeChange > 1.00 ? {
+          originalFee: quotedStorageFee,
+          updatedFee: currentStorageFee,
+          change: currentStorageFee - quotedStorageFee,
+          reason: 'Storage fees updated based on current storage duration'
+        } : null,
+        storageBreakdown: currentStorageFees.breakdown,
+        shipment: {
+          id: shipment.id,
+          shipmentNumber: shipment.shipmentNumber,
+          destination,
+          packageCount: packageQuery.length
+        },
+      });
+    } catch (error) {
+      console.error('Error creating Stripe payment intent:', error);
+      return NextResponse.json(
+        { error: 'Failed to create payment intent' },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('Error creating checkout session:', error);
     return NextResponse.json(
@@ -357,22 +365,31 @@ export async function GET(
                        (currentStorageFees.totalStorageFee - parseFloat(shipment.storageFee || '0'));
 
     // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(totalAmount * 100), // Convert to cents
-      currency: shipment.costCurrency?.toLowerCase() || 'usd',
-      metadata: {
-        shipmentId: shipment.id,
-        customerProfileId: userWithProfile.customerProfile.id,
-        tenantId: userWithProfile.customerProfile.tenantId
-      },
-      automatic_payment_methods: {
-        enabled: true
-      },
-      description: `Shipping for ${shipment.shipmentNumber}`,
-      receipt_email: userWithProfile.email
-    });
+    const stripe = await getStripe();
+    try {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(totalAmount * 100), // Convert to cents
+        currency: shipment.costCurrency?.toLowerCase() || 'usd',
+        metadata: {
+          shipmentId: shipment.id,
+          customerProfileId: userWithProfile.customerProfile.id,
+          tenantId: userWithProfile.customerProfile.tenantId
+        },
+        automatic_payment_methods: {
+          enabled: true
+        },
+        description: `Shipping for ${shipment.shipmentNumber}`,
+        receipt_email: userWithProfile.email
+      });
 
-    clientSecret = paymentIntent.client_secret;
+      clientSecret = paymentIntent.client_secret;
+    } catch (error) {
+      console.error('Error creating Stripe payment intent:', error);
+      return NextResponse.json(
+        { error: 'Failed to create payment intent' },
+        { status: 500 }
+      );
+    }
   }
 
   // Add clientSecret and canPay to the response

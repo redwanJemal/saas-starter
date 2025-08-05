@@ -3,8 +3,31 @@ import { redirect } from 'next/navigation';
 import { CustomerProfile } from '@/lib/db/schema';
 import { getCustomerByStripeCustomerId, getUser, updateCustomerSubscription } from '@/lib/db/queries';
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-04-30.basil'
+// Create a function to get the Stripe instance only when needed
+let stripeInstance: Stripe | null = null;
+
+export function getStripe(): Stripe {
+  if (!stripeInstance) {
+    const secretKey = process.env.STRIPE_SECRET_KEY;
+    
+    if (!secretKey) {
+      throw new Error('Missing Stripe secret key. Please set STRIPE_SECRET_KEY environment variable.');
+    }
+    
+    stripeInstance = new Stripe(secretKey, {
+      apiVersion: '2025-04-30.basil'
+    });
+  }
+  
+  return stripeInstance;
+}
+
+// For backward compatibility, provide a stripe export that gets initialized on first use
+export const stripe = new Proxy({} as Stripe, {
+  get: (target, prop) => {
+    const stripe = getStripe();
+    return stripe[prop as keyof Stripe];
+  }
 });
 
 export async function createCheckoutSession({
