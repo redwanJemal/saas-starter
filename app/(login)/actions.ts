@@ -18,7 +18,8 @@ import {
   type NewActivityLog, 
   DEFAULT_TENANT_SLUG, 
   CUSTOMER_ID_PREFIX, 
-  CUSTOMER_ID_LENGTH 
+  CUSTOMER_ID_LENGTH, 
+  NewCustomerWarehouseAssignment
 } from '@/lib/db/schema';
 import { comparePasswords, hashPassword, setSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
@@ -160,76 +161,126 @@ const signUpSchema = z.object({
 export const signUp = validatedAction(signUpSchema, async (data, formData) => {
   const { email, password, firstName, lastName, phone } = data;
 
-  // Get default tenant
-  const tenant = await getDefaultTenant();
-  if (!tenant) {
-    return { error: 'System configuration error. Please try again.' };
-  }
+  try {
+    // Get default tenant
+    const tenant = await getDefaultTenant();
+    if (!tenant) {
+      return { error: 'System configuration error. Please try again.' };
+    }
 
-  // Check if user already exists
-  const existingUser = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(
-      and(
-        eq(users.email, email),
-        eq(users.tenantId, tenant.id)
+    // Check if user already exists
+    const existingUser = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.email, email.toLowerCase().trim()),
+          eq(users.tenantId, tenant.id)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (existingUser.length > 0) {
-    return { error: 'User with this email already exists.' };
+    if (existingUser.length > 0) {
+      return { error: 'User with this email already exists.' };
+    }
+
+    // Hash password
+    const passwordHash = await hashPassword(password);
+
+    // Generate customer ID
+    const customerId = generateCustomerId();
+
+    // Start transaction-like operations
+    // Create user
+    const newUser: NewUser = {
+      tenantId: tenant.id,
+      email: email.toLowerCase().trim(),
+      passwordHash,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: phone?.trim() || null,
+      userType: 'customer',
+      status: 'active',
+    };
+
+    const createdUsers = await db.insert(users).values(newUser).returning();
+    if (!createdUsers || createdUsers.length === 0) {
+      throw new Error('Failed to create user');
+    }
+    const createdUser = createdUsers[0];
+
+    // Create customer profile
+    const newCustomerProfile: NewCustomerProfile = {
+      tenantId: tenant.id,
+      userId: createdUser.id,
+      customerId,
+      kycStatus: 'not_required',
+    };
+
+    const createdProfiles = await db.insert(customerProfiles).values(newCustomerProfile).returning();
+    if (!createdProfiles || createdProfiles.length === 0) {
+      throw new Error('Failed to create customer profile');
+    }
+    const createdProfile = createdProfiles[0];
+
+    // Assign warehouses to customer (create suite codes)
+    try {
+      const activeWarehouses = await db
+        .select({
+          id: warehouses.id,
+          code: warehouses.code,
+        })
+        .from(warehouses)
+        .where(
+          and(
+            eq(warehouses.tenantId, tenant.id),
+            eq(warehouses.status, 'active')
+          )
+        );
+
+      if (activeWarehouses.length > 0) {
+        const warehouseAssignments: NewCustomerWarehouseAssignment[] = activeWarehouses.map(warehouse => ({
+          tenantId: tenant.id,
+          customerProfileId: createdProfile.id,
+          warehouseId: warehouse.id,
+          suiteCode: customerId, // Use customer ID as suite code
+          status: 'active',
+          assignedBy: null, // System assigned
+        }));
+
+        await db.insert(customerWarehouseAssignments).values(warehouseAssignments);
+      }
+    } catch (warehouseError) {
+      console.error('Failed to assign warehouses:', warehouseError);
+      // Don't fail registration if warehouse assignment fails
+    }
+
+    // Log the sign-up activity
+    await logActivity(
+      tenant.id,
+      createdUser.id,
+      createdProfile.id,
+      'user.sign_up',
+      'User account created successfully',
+      'user'
+    );
+
+    // Set session
+    await setSession({
+      id: createdUser.id,
+      email: createdUser.email,
+      firstName: createdUser.firstName,
+      lastName: createdUser.lastName,
+    });
+
+    redirect('/dashboard');
+
+  } catch (error) {
+    console.error('Sign up error:', error);
+    return { 
+      error: 'Failed to create account. Please try again.' 
+    };
   }
-
-  // Hash password
-  const passwordHash = await hashPassword(password);
-
-  // Create user
-  const newUser: NewUser = {
-    tenantId: tenant.id,
-    email,
-    passwordHash,
-    firstName,
-    lastName,
-    phone: phone || null,
-    userType: 'customer',
-    status: 'active'
-  };
-
-  const createdUsers = await db.insert(users).values(newUser).returning();
-  const createdUser = createdUsers[0];
-
-  // Create customer profile
-  const newCustomerProfile: NewCustomerProfile = {
-    tenantId: tenant.id,
-    userId: createdUser.id,
-    customerId: generateCustomerId(),
-    kycStatus: 'not_required'
-  };
-
-  const createdProfiles = await db.insert(customerProfiles).values(newCustomerProfile).returning();
-  const createdProfile = createdProfiles[0];
-
-  // Log the sign-up activity
-  await logActivity(
-    tenant.id,
-    createdUser.id,
-    createdProfile.id,
-    'user.sign_up',
-    'User account created successfully',
-    'user'
-  );
-
-  // Set session - only pass the required fields
-  await setSession({
-    id: createdUser.id,
-    email: createdUser.email,
-    firstName: createdUser.firstName,
-    lastName: createdUser.lastName,
-  });
-
-  redirect('/dashboard');
 });
 
 const updateAccountSchema = z.object({
