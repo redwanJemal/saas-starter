@@ -14,7 +14,7 @@ import {
   warehouses,
   customerProfiles
 } from '@/lib/db/schema';
-import { eq, inArray, and, sql } from 'drizzle-orm';
+import { eq, inArray, and, sql, desc, or } from 'drizzle-orm';
 import { getUserWithProfile } from '@/lib/db/queries';
 import { ShippingRateCalculator } from '@/lib/services/shipping-rate-calculator';
 import { StorageFeeCalculator } from '@/lib/services/storage-fee-calculator';
@@ -25,6 +25,168 @@ async function generateShipmentNumber(): Promise<string> {
   const timestamp = Date.now().toString().slice(-8);
   const random = Math.random().toString(36).substr(2, 4).toUpperCase();
   return `${prefix}${timestamp}${random}`;
+}
+export async function GET(request: NextRequest) {
+  try {
+    const userWithProfile = await getUserWithProfile();
+    if (!userWithProfile?.customerProfile) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const offset = (page - 1) * limit;
+    const search = searchParams.get('search') || '';
+    const status = searchParams.get('status') || '';
+
+    // Build where conditions
+    let whereConditions = [
+      eq(shipments.customerProfileId, userWithProfile.customerProfile.id)
+    ];
+
+    // if (search) {
+    //   whereConditions.push(
+    //     or(
+    //       ilike(shipments.shipmentNumber, `%${search}%`),
+    //       ilike(shipments.trackingNumber, `%${search}%`)
+    //     )
+    //   );
+    // }
+
+    if (status && status !== 'all') {
+      whereConditions.push(eq(shipments.status, status as any));
+    }
+
+    // Combine conditions
+    const whereClause = whereConditions.length > 1 
+      ? sql`${whereConditions.reduce((acc, condition) => sql`${acc} AND ${condition}`)}`
+      : whereConditions[0];
+
+    // Get shipments with packages
+    const shipmentsWithPackages = await db
+      .select({
+        id: shipments.id,
+        shipmentNumber: shipments.shipmentNumber,
+        status: shipments.status,
+        trackingNumber: shipments.trackingNumber,
+        carrierCode: shipments.carrierCode,
+        serviceType: shipments.serviceType,
+        totalWeightKg: shipments.totalWeightKg,
+        totalDeclaredValue: shipments.totalDeclaredValue,
+        declaredValueCurrency: shipments.declaredValueCurrency,
+        totalCost: shipments.totalCost,
+        costCurrency: shipments.costCurrency,
+        quoteExpiresAt: shipments.quoteExpiresAt,
+        paidAt: shipments.paidAt,
+        dispatchedAt: shipments.dispatchedAt,
+        estimatedDeliveryDate: shipments.estimatedDeliveryDate,
+        deliveredAt: shipments.deliveredAt,
+        deliveryInstructions: shipments.deliveryInstructions,
+        requiresSignature: shipments.requiresSignature,
+        customsStatus: shipments.customsStatus,
+        commercialInvoiceUrl: shipments.commercialInvoiceUrl,
+        createdAt: shipments.createdAt,
+        updatedAt: shipments.updatedAt,
+        packageId: packages.id,
+        packageTrackingNumber: packages.trackingNumberInbound,
+        packageDescription: packages.description,
+        packageStatus: packages.status,
+        packageWeightKg: packages.weightActualKg,
+        packageLengthCm: packages.lengthCm,
+        packageWidthCm: packages.widthCm,
+        packageHeightCm: packages.heightCm,
+        packageEstimatedValue: packages.estimatedValue,
+        packageEstimatedValueCurrency: packages.estimatedValueCurrency,
+        packageSenderName: packages.senderName,
+        packageIsFragile: packages.isFragile,
+        packageIsHighValue: packages.isHighValue,
+        packageRequiresAdultSignature: packages.requiresAdultSignature,
+      })
+      .from(shipments)
+      .leftJoin(shipmentPackages, eq(shipments.id, shipmentPackages.shipmentId))
+      .leftJoin(packages, eq(shipmentPackages.packageId, packages.id))
+      .where(whereClause)
+      .orderBy(desc(shipments.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Get total count for pagination
+    const [{ count: totalCount }] = await db
+      .select({ count: sql<number>`count(distinct ${shipments.id})` })
+      .from(shipments)
+      .where(whereClause);
+
+    // Group packages by shipment
+    const shipmentsMap = new Map();
+    
+    shipmentsWithPackages.forEach((row) => {
+      if (!shipmentsMap.has(row.id)) {
+        shipmentsMap.set(row.id, {
+          id: row.id,
+          shipmentNumber: row.shipmentNumber,
+          status: row.status,
+          trackingNumber: row.trackingNumber,
+          carrierCode: row.carrierCode,
+          serviceType: row.serviceType,
+          totalWeightKg: row.totalWeightKg ? parseFloat(row.totalWeightKg) : 0,
+          totalDeclaredValue: row.totalDeclaredValue ? parseFloat(row.totalDeclaredValue) : 0,
+          declaredValueCurrency: row.declaredValueCurrency,
+          totalCost: row.totalCost ? parseFloat(row.totalCost) : null,
+          costCurrency: row.costCurrency,
+          quoteExpiresAt: row.quoteExpiresAt?.toISOString() || null,
+          paidAt: row.paidAt?.toISOString() || null,
+          dispatchedAt: row.dispatchedAt?.toISOString() || null,
+          estimatedDeliveryDate: row.estimatedDeliveryDate || null,
+          deliveredAt: row.deliveredAt?.toISOString() || null,
+          deliveryInstructions: row.deliveryInstructions,
+          requiresSignature: row.requiresSignature,
+          customsStatus: row.customsStatus,
+          commercialInvoiceUrl: row.commercialInvoiceUrl,
+          createdAt: row.createdAt.toISOString(),
+          updatedAt: row.updatedAt.toISOString(),
+          packages: []
+        });
+      }
+
+      if (row.packageId) {
+        shipmentsMap.get(row.id).packages.push({
+          id: row.packageId,
+          trackingNumberInbound: row.packageTrackingNumber,
+          description: row.packageDescription,
+          status: row.packageStatus,
+          weightActualKg: row.packageWeightKg ? parseFloat(row.packageWeightKg) : 0,
+          lengthCm: row.packageLengthCm ? parseFloat(row.packageLengthCm) : 0,
+          widthCm: row.packageWidthCm ? parseFloat(row.packageWidthCm) : 0,
+          heightCm: row.packageHeightCm ? parseFloat(row.packageHeightCm) : 0,
+          estimatedValue: row.packageEstimatedValue ? parseFloat(row.packageEstimatedValue) : 0,
+          estimatedValueCurrency: row.packageEstimatedValueCurrency || 'USD',
+          senderName: row.packageSenderName || '',
+          isFragile: row.packageIsFragile || false,
+          isHighValue: row.packageIsHighValue || false,
+          requiresAdultSignature: row.packageRequiresAdultSignature || false,
+        });
+      }
+    });
+
+    const shipmentsWithDetails = Array.from(shipmentsMap.values());
+
+    return NextResponse.json({
+      shipments: shipmentsWithDetails,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        pages: Math.ceil(totalCount / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching customer shipments:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch shipments' },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -241,6 +403,9 @@ export async function POST(request: NextRequest) {
 
     // Keep packages as ready_to_ship until payment is complete
     // They will be updated to 'shipped' after successful payment
+
+    // update packages status to reserved
+    await db.update(packages).set({ status: 'reserved' }).where(inArray(packages.id, packageQuery.map(pkg => pkg.id)));
 
     // Prepare response data
     const responseData = {

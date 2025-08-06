@@ -19,6 +19,7 @@ export const packageStatusEnum = pgEnum('package_status', [
   'received', 
   'processing',
   'ready_to_ship',
+  'reserved',
   'shipped',
   'delivered',
   'returned',
