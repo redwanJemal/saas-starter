@@ -150,6 +150,7 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
   redirect('/dashboard');
 });
 
+
 const signUpSchema = z.object({
   email: z.string().email().min(3).max(255),
   password: z.string().min(8).max(100),
@@ -174,111 +175,126 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
       .from(users)
       .where(
         and(
-          eq(users.email, email.toLowerCase().trim()),
+          eq(users.email, email),
           eq(users.tenantId, tenant.id)
         )
       )
       .limit(1);
 
     if (existingUser.length > 0) {
-      return { error: 'User with this email already exists.' };
+      return { error: 'An account with this email already exists.' };
     }
 
     // Hash password
     const passwordHash = await hashPassword(password);
 
-    // Generate customer ID
-    const customerId = generateCustomerId();
-
-    // Start transaction-like operations
     // Create user
     const newUser: NewUser = {
-      tenantId: tenant.id,
-      email: email.toLowerCase().trim(),
+      email,
       passwordHash,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      phone: phone?.trim() || null,
+      firstName,
+      lastName,
+      phone: phone || null,
+      tenantId: tenant.id,
       userType: 'customer',
       status: 'active',
     };
 
-    const createdUsers = await db.insert(users).values(newUser).returning();
-    if (!createdUsers || createdUsers.length === 0) {
-      throw new Error('Failed to create user');
+    const insertedUsers = await db.insert(users).values(newUser).returning({
+      id: users.id,
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+    });
+
+    const user = insertedUsers[0];
+
+    // Generate unique customer ID
+    let customerId = generateCustomerId();
+    let isUnique = false;
+    let attempts = 0;
+
+    while (!isUnique && attempts < 10) {
+      const existingCustomer = await db
+        .select({ id: customerProfiles.id })
+        .from(customerProfiles)
+        .where(eq(customerProfiles.customerId, customerId))
+        .limit(1);
+
+      if (existingCustomer.length === 0) {
+        isUnique = true;
+      } else {
+        customerId = generateCustomerId();
+        attempts++;
+      }
     }
-    const createdUser = createdUsers[0];
+
+    if (!isUnique) {
+      return { error: 'Unable to generate customer ID. Please try again.' };
+    }
 
     // Create customer profile
     const newCustomerProfile: NewCustomerProfile = {
-      tenantId: tenant.id,
-      userId: createdUser.id,
+      userId: user.id,
       customerId,
-      kycStatus: 'not_required',
+      tenantId: tenant.id,
     };
 
-    const createdProfiles = await db.insert(customerProfiles).values(newCustomerProfile).returning();
-    if (!createdProfiles || createdProfiles.length === 0) {
-      throw new Error('Failed to create customer profile');
+    const insertedProfiles = await db
+      .insert(customerProfiles)
+      .values(newCustomerProfile)
+      .returning({ id: customerProfiles.id });
+
+    const customerProfile = insertedProfiles[0];
+
+    // Get available warehouse for assignment
+    const availableWarehouse = await db
+      .select({ id: warehouses.id })
+      .from(warehouses)
+      .where(eq(warehouses.tenantId, tenant.id))
+      .limit(1);
+
+    if (availableWarehouse.length > 0) {
+      const newAssignment: NewCustomerWarehouseAssignment = {
+        customerProfileId: customerProfile.id,
+        warehouseId: availableWarehouse[0].id,
+        suiteCode: '',
+        assignedAt: new Date(),
+      };
+
+      await db.insert(customerWarehouseAssignments).values(newAssignment);
     }
-    const createdProfile = createdProfiles[0];
 
-    // Assign warehouses to customer (create suite codes)
-    try {
-      const activeWarehouses = await db
-        .select({
-          id: warehouses.id,
-          code: warehouses.code,
-        })
-        .from(warehouses)
-        .where(
-          and(
-            eq(warehouses.tenantId, tenant.id),
-            eq(warehouses.status, 'active')
-          )
-        );
-
-      if (activeWarehouses.length > 0) {
-        const warehouseAssignments: NewCustomerWarehouseAssignment[] = activeWarehouses.map(warehouse => ({
-          tenantId: tenant.id,
-          customerProfileId: createdProfile.id,
-          warehouseId: warehouse.id,
-          suiteCode: customerId, // Use customer ID as suite code
-          status: 'active',
-          assignedBy: null, // System assigned
-        }));
-
-        await db.insert(customerWarehouseAssignments).values(warehouseAssignments);
-      }
-    } catch (warehouseError) {
-      console.error('Failed to assign warehouses:', warehouseError);
-      // Don't fail registration if warehouse assignment fails
-    }
+    // Set session
+    await setSession({
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    });
 
     // Log the sign-up activity
     await logActivity(
       tenant.id,
-      createdUser.id,
-      createdProfile.id,
+      user.id,
+      customerProfile.id,
       'user.sign_up',
       'User account created successfully',
-      'user'
+      'authentication'
     );
 
-    // Set session
-    await setSession({
-      id: createdUser.id,
-      email: createdUser.email,
-      firstName: createdUser.firstName,
-      lastName: createdUser.lastName,
-    });
-
+    // Handle redirect properly - don't catch redirect errors
     redirect('/dashboard');
 
   } catch (error) {
+    // Handle NEXT_REDIRECT error properly - let it propagate
+    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+      throw error; // Re-throw redirect errors to allow proper navigation
+    }
+    
     console.error('Sign up error:', error);
-    return { 
-      error: 'Failed to create account. Please try again.' 
+    return {
+      error: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.'
     };
   }
 });

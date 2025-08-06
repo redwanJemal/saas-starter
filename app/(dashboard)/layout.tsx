@@ -35,7 +35,18 @@ function UserMenu() {
 
   if (!user) {
     return (
-      <div className="w-8 h-8 rounded-full bg-gray-300 animate-pulse" />
+      <div className="flex items-center space-x-2">
+              <Link href="/sign-in">
+                <Button variant="ghost" size="sm">
+                  Sign In
+                </Button>
+              </Link>
+              <Link href="/sign-up">
+                <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
+                  Sign Up
+                </Button>
+              </Link>
+            </div>
     );
   }
 
