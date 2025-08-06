@@ -8,8 +8,8 @@ interface LogoProps {
 
 export function Logo({ 
   className, 
-  width = 48, 
-  height = 48 
+  width = 200, 
+  height = 200 
 }: LogoProps) {
   return (
     <img
