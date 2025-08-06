@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { ShipmentsSkeleton } from '@/components/loading/skeleton-components';
 
 interface Package {
   id: string;
@@ -440,7 +441,7 @@ export default function ShipmentsPage() {
   if (loading && shipments.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <ShipmentsSkeleton />
       </div>
     );
   }

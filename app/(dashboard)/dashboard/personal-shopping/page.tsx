@@ -11,6 +11,7 @@ import { Plus, ShoppingCart, Clock, CheckCircle, XCircle, Eye } from 'lucide-rea
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { PersonalShoppingSkeleton } from '@/components/loading/skeleton-components';
 
 interface PersonalShoppingRequest {
   id: string;
@@ -165,7 +166,7 @@ export default function PersonalShoppingDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <PersonalShoppingSkeleton />
       </div>
     );
   }
