@@ -5,7 +5,7 @@ import { SWRConfig } from 'swr';
 import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
-  title: 'Package Forwarding Platform',
+  title: 'UkToEast',
   description: 'Global package forwarding and personal shopping service.',
   // Add other metadata properties as needed
 };
