@@ -50,6 +50,7 @@ interface Package {
   isHighValue: boolean;
   warehouseName: string;
   courierTrackingUrl: string;
+  courierName: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -303,7 +304,7 @@ export default function PackagesPage() {
                         <Truck className="h-4 w-4 text-gray-400" />
                         <div>
                           <p className="text-xs text-gray-500">From</p>
-                          <p className="text-sm font-medium">{pkg.senderName || 'Unknown'}</p>
+                          <p className="text-sm font-medium">{pkg.courierName || 'Unknown'}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

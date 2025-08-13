@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Scan, Package, Trash2, Save, FileText, Upload, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface ScannedItem {
   id: string
@@ -74,13 +75,13 @@ export default function PreReceivingPage() {
       setCouriers(activeCouriers)
     } catch (error) {
       console.error('Error loading couriers:', error)
-      alert('Error loading couriers. Please refresh the page.')
+      toast.error('Error loading couriers. Please refresh the page.')
     }
   }
 
   const startNewBatch = async () => {
     if (!selectedCourier || !expectedPieces || !arrivalDate) {
-      alert('Please fill in all required fields')
+      toast.error('Please fill in all required fields')
       return
     }
 
@@ -119,7 +120,7 @@ export default function PreReceivingPage() {
       }
     } catch (error) {
       console.error('Error creating batch:', error)
-      alert('Error creating batch. Please try again.')
+      toast.error('Error creating batch. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -213,7 +214,7 @@ export default function PreReceivingPage() {
       })
 
       if (response.ok) {
-        alert(`Batch completed successfully! Scanned ${scannedItems.filter(i => i.status === 'scanned').length} items.`)
+        toast.success(`Batch completed successfully! Scanned ${scannedItems.filter(i => i.status === 'scanned').length} items.`)
         // Reset form
         setCurrentBatch(null)
         setIsScanning(false)
@@ -224,7 +225,7 @@ export default function PreReceivingPage() {
       }
     } catch (error) {
       console.error('Error completing batch:', error)
-      alert('Error completing batch. Please try again.')
+      toast.error('Error completing batch. Please try again.')
     } finally {
       setLoading(false)
     }

@@ -14,6 +14,7 @@ import { PackageMeasurements } from './components/PackageMeasurements';
 import { PackageDeclaration } from './components/PackageDeclaration';
 import PictureUpload from './components/package-image-upload';
 import { PackageStatus } from './components/PackageStatus';
+import { toast } from 'sonner';
 
 interface AssignedItem {
   id: string;
@@ -132,7 +133,7 @@ export default function PackageReceivingPage() {
       setTotalPages(Math.ceil((data.pagination?.total || 0) / 20));
     } catch (error) {
       console.error('Error fetching assigned items:', error);
-      alert('Error loading assigned items. Please try again.');
+      toast.error('Error loading assigned items. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -282,7 +283,7 @@ export default function PackageReceivingPage() {
         // Don't fail the operation
       }
 
-      alert(`Package ${result.internalId || internalId} received successfully!`);
+      toast.success(`Package ${result.internalId || internalId} received successfully!`);
       
       // Reset form and refresh list
       setSelectedItem(null);
@@ -291,7 +292,7 @@ export default function PackageReceivingPage() {
       
     } catch (error) {
       console.error('Error saving package:', error);
-      alert('Error saving package. Please try again.');
+      toast.error('Error saving package. Please try again.');
     } finally {
       setSaving(false);
     }

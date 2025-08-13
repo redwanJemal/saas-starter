@@ -22,6 +22,7 @@ import {
   X
 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 interface UnassignedItem {
   id: string;
@@ -179,12 +180,12 @@ export default function PackageAssignmentPage() {
 
   const handleBulkAssignment = async () => {
     if (selectedItems.size === 0) {
-      alert('Please select at least one item to assign');
+      toast.error('Please select at least one item to assign');
       return;
     }
 
     if (!selectedCustomer) {
-      alert('Please select a customer');
+      toast.error('Please select a customer');
       return;
     }
 
@@ -205,7 +206,7 @@ export default function PackageAssignmentPage() {
       }
 
       const result = await response.json();
-      alert(`Successfully assigned ${selectedItems.size} items to ${result.customer.name}`);
+      toast.success(`Successfully assigned ${selectedItems.size} items to ${result.customer.name}`);
       
       // Reset selections and refresh data
       setSelectedItems(new Set());
@@ -214,7 +215,7 @@ export default function PackageAssignmentPage() {
       fetchUnassignedItems();
     } catch (error) {
       console.error('Error assigning packages:', error);
-      alert(error instanceof Error ? error.message : 'Failed to assign packages');
+      toast.error(error instanceof Error ? error.message : 'Failed to assign packages');
     } finally {
       setAssigning(false);
     }
