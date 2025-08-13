@@ -23,6 +23,7 @@ import { getUserWithProfile } from '@/lib/db/queries';
 import { getEnhancedCustomerDashboardStats, getCustomerRecentPackages, getCustomerRecentIncomingItems } from '@/lib/db/queries-customer-enhanced';
 import { redirect } from 'next/navigation';
 import { format } from 'date-fns';
+import { VirtualAddresses } from './components/virtual-addresses';
 
 // Component for enhanced dashboard stats
 async function EnhancedDashboardStats() {
@@ -405,92 +406,6 @@ async function PackageStatusOverview() {
   );
 }
 
-// Component for Virtual Addresses (existing functionality)
-async function VirtualAddresses() {
-  const userWithProfile = await getUserWithProfile();
-  if (!userWithProfile?.customerProfile) {
-    return null;
-  }
-
-  // This would be replaced with actual virtual addresses query
-  const virtualAddresses = [
-    {
-      id: '1',
-      name: 'US Address',
-      address: '1234 Main St, Suite 100',
-      city: 'Miami',
-      state: 'FL',
-      zipCode: '33101',
-      country: 'United States',
-      isDefault: true,
-    }
-  ];
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <MapPin className="h-5 w-5" />
-          Virtual Addresses
-        </CardTitle>
-        <Link href="/dashboard/addresses">
-          <Button variant="outline" size="sm">
-            Manage
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        </Link>
-      </CardHeader>
-      <CardContent>
-        {virtualAddresses.length > 0 ? (
-          <div className="space-y-4">
-            {virtualAddresses.map((address) => (
-              <div
-                key={address.id}
-                className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-medium">{address.name}</h3>
-                      {address.isDefault && (
-                        <Badge variant="outline" className="text-green-600 border-green-200">
-                          Default
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      {address.address}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {address.city}, {address.state} {address.zipCode}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {address.country}
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Copy
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No addresses yet</h3>
-            <p className="text-gray-600 mb-4">
-              Get your virtual addresses to start shopping globally.
-            </p>
-            <Button>
-              Get Virtual Address
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
 // Skeleton components
 function DashboardStatsSkeleton() {

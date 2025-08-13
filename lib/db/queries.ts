@@ -158,17 +158,56 @@ export async function getCustomerShipments(customerProfileId: string, limit = 10
   });
 }
 
-// Get virtual addresses for customer
 export async function getCustomerVirtualAddresses(customerProfileId: string) {
-  return await (db as any).query.customerWarehouseAssignments.findMany({
-    where: and(
-      eq(customerWarehouseAssignments.customerProfileId, customerProfileId),
-      eq(customerWarehouseAssignments.status, 'active')
-    ),
-    with: {
-      warehouse: true
-    }
-  });
+  return await db
+    .select({
+      // Assignment info
+      id: customerWarehouseAssignments.id,
+      customerProfileId: customerWarehouseAssignments.customerProfileId,
+      warehouseId: customerWarehouseAssignments.warehouseId,
+      suiteCode: customerWarehouseAssignments.suiteCode,
+      status: customerWarehouseAssignments.status,
+      assignedAt: customerWarehouseAssignments.assignedAt,
+      
+      // Warehouse info
+      warehouse: {
+        id: warehouses.id,
+        name: warehouses.name,
+        code: warehouses.code,
+        addressLine1: warehouses.addressLine1,
+        addressLine2: warehouses.addressLine2,
+        city: warehouses.city,
+        stateProvince: warehouses.stateProvince,
+        postalCode: warehouses.postalCode,
+        countryCode: warehouses.countryCode,
+        phone: warehouses.phone,
+      },
+      
+      // Customer profile info
+      customerProfile: {
+        id: customerProfiles.id,
+        customerId: customerProfiles.customerId,
+      },
+      
+      // User info
+      user: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        phone: users.phone,
+      }
+    })
+    .from(customerWarehouseAssignments)
+    .innerJoin(warehouses, eq(customerWarehouseAssignments.warehouseId, warehouses.id))
+    .innerJoin(customerProfiles, eq(customerWarehouseAssignments.customerProfileId, customerProfiles.id))
+    .innerJoin(users, eq(customerProfiles.userId, users.id))
+    .where(
+      and(
+        eq(customerWarehouseAssignments.customerProfileId, customerProfileId),
+        eq(customerWarehouseAssignments.status, 'active')
+      )
+    );
 }
 
 // Get activity logs for customer
