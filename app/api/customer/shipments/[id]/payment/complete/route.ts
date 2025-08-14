@@ -160,7 +160,7 @@ export async function POST(
         paidAt: now,
         paymentMethod: 'stripe',
         paymentReference: paymentIntentId,
-        shipmentId: shipment.id,
+        referenceId: shipment.id,
         notes: `Payment completed via Stripe on ${now.toLocaleDateString()}`
       })
       .returning();

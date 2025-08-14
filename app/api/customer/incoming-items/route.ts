@@ -36,7 +36,6 @@ export async function GET(request: NextRequest) {
         heightCm: incomingShipmentItems.heightCm,
         isFragile: incomingShipmentItems.isFragile,
         isHighValue: incomingShipmentItems.isHighValue,
-        requiresInspection: incomingShipmentItems.requiresInspection,
         notes: incomingShipmentItems.notes,
         specialInstructions: incomingShipmentItems.specialInstructions,
         // Incoming shipment info
@@ -85,7 +84,6 @@ export async function GET(request: NextRequest) {
         heightCm: safeItem.heightCm ? Number(safeItem.heightCm) : 0,
         isFragile: Boolean(safeItem.isFragile),
         isHighValue: Boolean(safeItem.isHighValue),
-        requiresInspection: Boolean(safeItem.requiresInspection),
         notes: safeItem.notes || '',
         specialInstructions: safeItem.specialInstructions || '',
         batchReference: safeItem.batchReference || '',

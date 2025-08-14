@@ -6,7 +6,7 @@ CREATE TYPE "public"."invoice_type" AS ENUM('shipping', 'storage', 'handling', '
 CREATE TYPE "public"."item_assignment_status" AS ENUM('unassigned', 'assigned', 'received');--> statement-breakpoint
 CREATE TYPE "public"."kyc_status" AS ENUM('not_required', 'pending', 'approved', 'rejected');--> statement-breakpoint
 CREATE TYPE "public"."notification_status" AS ENUM('pending', 'sent', 'delivered', 'failed', 'bounced', 'unread');--> statement-breakpoint
-CREATE TYPE "public"."package_status" AS ENUM('expected', 'received', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'returned', 'disposed', 'missing', 'damaged', 'held');--> statement-breakpoint
+CREATE TYPE "public"."package_status" AS ENUM('expected', 'received', 'processing', 'ready_to_ship', 'reserved', 'shipped', 'delivered', 'returned', 'disposed', 'missing', 'damaged', 'held');--> statement-breakpoint
 CREATE TYPE "public"."payment_status" AS ENUM('pending', 'paid', 'partially_paid', 'overdue', 'cancelled', 'refunded');--> statement-breakpoint
 CREATE TYPE "public"."risk_level" AS ENUM('low', 'medium', 'high');--> statement-breakpoint
 CREATE TYPE "public"."role_type" AS ENUM('customer', 'admin', 'staff');--> statement-breakpoint
@@ -231,7 +231,8 @@ CREATE TABLE "financial_invoices" (
 	"customer_profile_id" uuid NOT NULL,
 	"invoice_number" varchar(50) NOT NULL,
 	"invoice_type" "invoice_type" NOT NULL,
-	"shipment_id" uuid,
+	"reference_id" uuid,
+	"reference_type" varchar(50) DEFAULT 'shipment' NOT NULL,
 	"subtotal" numeric(12, 2) NOT NULL,
 	"tax_amount" numeric(12, 2) DEFAULT '0.00',
 	"discount_amount" numeric(12, 2) DEFAULT '0.00',
@@ -394,6 +395,7 @@ CREATE TABLE "packages" (
 	"internal_id" varchar(50) NOT NULL,
 	"suite_code_captured" varchar(50),
 	"tracking_number_inbound" varchar(255),
+	"courier_name" varchar(255),
 	"sender_name" varchar(255),
 	"sender_company" varchar(255),
 	"sender_tracking_url" varchar(500),
@@ -422,7 +424,8 @@ CREATE TABLE "packages" (
 	"processed_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "packages_internal_id_unique" UNIQUE("internal_id")
+	CONSTRAINT "packages_internal_id_unique" UNIQUE("internal_id"),
+	CONSTRAINT "unique_tracking_courier_per_tenant" UNIQUE("tracking_number_inbound","courier_name","tenant_id")
 );
 --> statement-breakpoint
 CREATE TABLE "shipping_rates" (
@@ -715,9 +718,11 @@ CREATE TABLE "incoming_shipment_items" (
 	"special_instructions" text,
 	"is_fragile" boolean DEFAULT false,
 	"is_high_value" boolean DEFAULT false,
-	"requires_inspection" boolean DEFAULT false,
+	"requires_adult_signature" boolean DEFAULT false,
+	"is_restricted" boolean DEFAULT false,
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "unique_tracking_courier_shipment" UNIQUE("tracking_number","courier_name","tenant_id")
 );
 --> statement-breakpoint
 CREATE TABLE "incoming_shipments" (
@@ -842,7 +847,7 @@ ALTER TABLE "temporary_documents" ADD CONSTRAINT "temporary_documents_document_i
 ALTER TABLE "financial_invoice_lines" ADD CONSTRAINT "financial_invoice_lines_invoice_id_financial_invoices_id_fk" FOREIGN KEY ("invoice_id") REFERENCES "public"."financial_invoices"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "financial_invoices" ADD CONSTRAINT "financial_invoices_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "financial_invoices" ADD CONSTRAINT "financial_invoices_customer_profile_id_customer_profiles_id_fk" FOREIGN KEY ("customer_profile_id") REFERENCES "public"."customer_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "financial_invoices" ADD CONSTRAINT "financial_invoices_shipment_id_shipments_id_fk" FOREIGN KEY ("shipment_id") REFERENCES "public"."shipments"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "financial_invoices" ADD CONSTRAINT "financial_invoices_reference_id_shipments_id_fk" FOREIGN KEY ("reference_id") REFERENCES "public"."shipments"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_permission_id_permissions_id_fk" FOREIGN KEY ("permission_id") REFERENCES "public"."permissions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "roles" ADD CONSTRAINT "roles_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -913,4 +918,10 @@ ALTER TABLE "personal_shopper_request_status_history" ADD CONSTRAINT "personal_s
 ALTER TABLE "personal_shopper_requests" ADD CONSTRAINT "personal_shopper_requests_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "personal_shopper_requests" ADD CONSTRAINT "personal_shopper_requests_customer_profile_id_customer_profiles_id_fk" FOREIGN KEY ("customer_profile_id") REFERENCES "public"."customer_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "personal_shopper_requests" ADD CONSTRAINT "personal_shopper_requests_quoted_by_users_id_fk" FOREIGN KEY ("quoted_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "personal_shopper_requests" ADD CONSTRAINT "personal_shopper_requests_purchased_by_users_id_fk" FOREIGN KEY ("purchased_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "personal_shopper_requests" ADD CONSTRAINT "personal_shopper_requests_purchased_by_users_id_fk" FOREIGN KEY ("purchased_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "packages_tracking_number_idx" ON "packages" USING btree ("tracking_number_inbound");--> statement-breakpoint
+CREATE INDEX "packages_status_idx" ON "packages" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "packages_customer_idx" ON "packages" USING btree ("customer_profile_id");--> statement-breakpoint
+CREATE INDEX "incoming_items_tracking_number_idx" ON "incoming_shipment_items" USING btree ("tracking_number");--> statement-breakpoint
+CREATE INDEX "incoming_items_assignment_status_idx" ON "incoming_shipment_items" USING btree ("assignment_status");--> statement-breakpoint
+CREATE INDEX "incoming_items_scanned_at_idx" ON "incoming_shipment_items" USING btree ("scanned_at");

@@ -30,3 +30,10 @@ export function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+
+
+export const formatWeight = (weight: unknown, fixedDigits: number = 1): string => {
+  const num = Number(weight);
+  return Number.isFinite(num) ? `${num.toFixed(fixedDigits)} kg` : 'N/A';
+};
+

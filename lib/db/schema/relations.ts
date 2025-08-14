@@ -334,7 +334,7 @@ export const financialInvoicesRelations = relations(financialInvoices, ({ one, m
     references: [customerProfiles.id],
   }),
   shipment: one(shipments, {
-    fields: [financialInvoices.shipmentId],
+    fields: [financialInvoices.referenceId],
     references: [shipments.id],
   }),
   invoiceLines: many(financialInvoiceLines),

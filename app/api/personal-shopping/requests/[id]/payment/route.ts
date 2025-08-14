@@ -144,8 +144,8 @@ export async function POST(
         personal_shopper_request_id: personalShopperRequest.id,
         customer_profile_id: personalShopperRequest.customerProfileId,
       },
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/personal-shopping/requests/${requestId}?payment=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/personal-shopping/requests/${requestId}?payment=cancelled`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/personal-shopping/requests/${requestId}?payment=success`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/personal-shopping/requests/${requestId}?payment=cancelled`,
     });
 
     // Update invoice with Stripe payment reference

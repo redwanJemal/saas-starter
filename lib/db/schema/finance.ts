@@ -19,7 +19,8 @@ export const financialInvoices = pgTable('financial_invoices', {
   invoiceType: invoiceTypeEnum('invoice_type').notNull(),
   
   // References
-  shipmentId: uuid('shipment_id').references(() => shipments.id),
+  referenceId: uuid('reference_id').references(() => shipments.id),
+  referenceType: varchar('reference_type', { length: 50 }).notNull().default('shipment'),
   
   // Financial details
   subtotal: decimal('subtotal', { precision: 12, scale: 2 }).notNull(),

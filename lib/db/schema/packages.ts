@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp, decimal, integer, boolean, date } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp, decimal, integer, boolean, date, index, unique } from 'drizzle-orm/pg-core';
 import { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 import { packageStatusEnum } from './enums';
 import { tenants } from './tenancy';
@@ -28,6 +28,7 @@ export const packages = pgTable('packages', {
   
   // Inbound tracking
   trackingNumberInbound: varchar('tracking_number_inbound', { length: 255 }),
+  courierName: varchar('courier_name', { length: 255 }), // Store courier name for reference
   senderName: varchar('sender_name', { length: 255 }),
   senderCompany: varchar('sender_company', { length: 255 }),
   senderTrackingUrl: varchar('sender_tracking_url', { length: 500 }),
@@ -37,7 +38,7 @@ export const packages = pgTable('packages', {
   estimatedValue: decimal('estimated_value', { precision: 12, scale: 2 }).default('0'),
   estimatedValueCurrency: varchar('estimated_value_currency', { length: 3 }).default('USD'),
   
-  // Physical properties - Using decimal for proper type handling
+  // Physical properties
   weightActualKg: decimal('weight_actual_kg', { precision: 8, scale: 3 }),
   lengthCm: decimal('length_cm', { precision: 8, scale: 2 }),
   widthCm: decimal('width_cm', { precision: 8, scale: 2 }),
@@ -57,7 +58,7 @@ export const packages = pgTable('packages', {
   customerNotes: text('customer_notes'),
   specialInstructions: text('special_instructions'),
   
-  // Package characteristics
+  // Flags
   isFragile: boolean('is_fragile').default(false),
   isHighValue: boolean('is_high_value').default(false),
   requiresAdultSignature: boolean('requires_adult_signature').default(false),
@@ -70,6 +71,19 @@ export const packages = pgTable('packages', {
   // Timestamps
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => {
+  return {
+    // Unique constraint to prevent duplicate tracking numbers with same courier for same tenant
+    uniqueTrackingCourier: unique('unique_tracking_courier_per_tenant').on(
+      table.trackingNumberInbound, 
+      table.courierName, 
+      table.tenantId
+    ),
+    // Index for performance
+    trackingNumberIdx: index('packages_tracking_number_idx').on(table.trackingNumberInbound),
+    statusIdx: index('packages_status_idx').on(table.status),
+    customerIdx: index('packages_customer_idx').on(table.customerProfileId),
+  };
 });
 
 export const packageStatusHistory = pgTable('package_status_history', {

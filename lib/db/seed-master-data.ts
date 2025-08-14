@@ -1,4 +1,5 @@
 // lib/db/seed-master-data.ts
+import 'dotenv/config'; // Load environment variables from .env file
 import { db } from './drizzle';
 import { countries, currencies, couriers, tenantCurrencies, tenantCouriers, tenants } from './schema';
 import { eq } from 'drizzle-orm';

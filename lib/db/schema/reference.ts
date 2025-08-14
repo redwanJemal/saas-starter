@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp, boolean, jsonb, integer, date, decimal } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp, boolean, jsonb, integer, date, decimal, unique, index } from 'drizzle-orm/pg-core';
 import { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 import { incomingShipmentStatusEnum, itemAssignmentStatusEnum } from './enums';
 import { tenants } from './tenancy';
@@ -167,8 +167,6 @@ export const incomingShipmentItems = pgTable('incoming_shipment_items', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
   warehouseId: uuid('warehouse_id').references(() => warehouses.id, { onDelete: 'cascade' }).notNull(),
-  
-  // Fixed: Add missing incomingShipmentId field
   incomingShipmentId: uuid('incoming_shipment_id').references(() => incomingShipments.id, { onDelete: 'cascade' }).notNull(),
   
   // Tracking and courier info
@@ -176,11 +174,11 @@ export const incomingShipmentItems = pgTable('incoming_shipment_items', {
   courierName: varchar('courier_name', { length: 255 }),
   courierTrackingUrl: varchar('courier_tracking_url', { length: 500 }),
   
-  // Scanning info - Fixed: Add missing scannedBy field
+  // Scanning info
   scannedBy: uuid('scanned_by').references(() => users.id),
   scannedAt: timestamp('scanned_at'),
   
-  // Assignment info - Fixed: Add missing assignedBy field
+  // Assignment info
   assignedCustomerProfileId: uuid('assigned_customer_profile_id').references(() => customerProfiles.id),
   assignedBy: uuid('assigned_by').references(() => users.id),
   assignedAt: timestamp('assigned_at'),
@@ -204,11 +202,25 @@ export const incomingShipmentItems = pgTable('incoming_shipment_items', {
   // Status flags
   isFragile: boolean('is_fragile').default(false),
   isHighValue: boolean('is_high_value').default(false),
-  requiresInspection: boolean('requires_inspection').default(false),
+  requiresAdultSignature: boolean('requires_adult_signature').default(false),
+  isRestricted: boolean('is_restricted').default(false),
   
   // Timestamps
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => {
+  return {
+    // Unique constraint for tracking number + courier + tenant
+    uniqueTrackingCourierShipment: unique('unique_tracking_courier_shipment').on(
+      table.trackingNumber,
+      table.courierName,
+      table.tenantId
+    ),
+    // Index for performance
+    trackingNumberIdx: index('incoming_items_tracking_number_idx').on(table.trackingNumber),
+    assignmentStatusIdx: index('incoming_items_assignment_status_idx').on(table.assignmentStatus),
+    scannedAtIdx: index('incoming_items_scanned_at_idx').on(table.scannedAt),
+  };
 });
 
 // Type exports

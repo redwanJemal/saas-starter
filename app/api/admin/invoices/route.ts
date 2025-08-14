@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       .from(financialInvoices)
       .innerJoin(customerProfiles, eq(financialInvoices.customerProfileId, customerProfiles.id))
       .innerJoin(users, eq(customerProfiles.userId, users.id))
-      .leftJoin(shipments, eq(financialInvoices.shipmentId, shipments.id))
+      .leftJoin(shipments, eq(financialInvoices.referenceId, shipments.id))
       .orderBy(desc(financialInvoices.createdAt))
       .limit(limit)
       .offset(offset);

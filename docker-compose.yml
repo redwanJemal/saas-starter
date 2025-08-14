@@ -8,7 +8,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: runner
     container_name: package_forwarding_app
     restart: unless-stopped
     ports:
