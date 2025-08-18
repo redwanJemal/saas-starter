@@ -180,3 +180,69 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+
+// Update shipment status
+export async function PATCH(request: NextRequest) {
+  try {
+    // Check permission
+    const adminUser = await requirePermission('packages.update');
+
+    const body = await request.json();
+    const { itemId, status } = body;
+
+    // Validate input
+    if (!itemId) {
+      return NextResponse.json(
+        { error: 'Item ID is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!status || !['assigned', 'received', 'processing', 'completed'].includes(status)) {
+      return NextResponse.json(
+        { error: 'Valid status is required (assigned, received, processing, completed)' },
+        { status: 400 }
+      );
+    }
+
+    // Verify the item exists
+    const [item] = await db
+      .select({
+        id: incomingShipmentItems.id,
+        trackingNumber: incomingShipmentItems.trackingNumber,
+        assignmentStatus: incomingShipmentItems.assignmentStatus,
+      })
+      .from(incomingShipmentItems)
+      .where(eq(incomingShipmentItems.id, itemId))
+      .limit(1);
+
+    if (!item) {
+      return NextResponse.json(
+        { error: 'Item not found' },
+        { status: 404 }
+      );
+    }
+
+    // Update the item status
+    const [updatedItem] = await db
+      .update(incomingShipmentItems)
+      .set({
+        assignmentStatus: status,
+        updatedAt: sql`now()`,
+        ...(status === 'received' && { receivedAt: sql`now()` }),
+      })
+      .where(eq(incomingShipmentItems.id, itemId))
+      .returning();
+
+    return NextResponse.json({
+      success: true,
+      item: updatedItem
+    });
+  } catch (error) {
+    console.error('Error updating item status:', error);
+    return NextResponse.json(
+      { error: 'Failed to update item status' },
+      { status: 500 }
+    );
+  }
+}
