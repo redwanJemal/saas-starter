@@ -59,6 +59,11 @@ export const shipments = pgTable('shipments', {
   // Status tracking
   status: shipmentStatusEnum('status').default('quote_requested'),
   
+  // Payment tracking
+  paymentMethod: varchar('payment_method', { length: 50 }),
+  stripePaymentIntentId: varchar('stripe_payment_intent_id', { length: 255 }),
+  paymentReference: varchar('payment_reference', { length: 255 }),
+  
   // Important dates
   quoteExpiresAt: timestamp('quote_expires_at'),
   paidAt: timestamp('paid_at'),
